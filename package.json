@@ -1,0 +1,44 @@
+{
+  "name": "@mindbricks/genesis-set",
+  "version": "0.1.0",
+  "description": "PRE-RELEASE. Genesis compiler skills for coding agents (Claude Code, Codex): the generated code, its runtime and the Genesis Compiler API, on top of mind-set.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mindbricks/genesis-set.git"
+  },
+  "homepage": "https://github.com/Mindbricks/genesis-set#readme",
+  "bugs": {
+    "url": "https://github.com/Mindbricks/genesis-set/issues"
+  },
+  "type": "module",
+  "bin": {
+    "genesis-set": "bin/genesis-set.mjs"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "skills/",
+    "corpus/",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node test/run.mjs"
+  },
+  "keywords": [
+    "openappl",
+    "genesis",
+    "compiler",
+    "claude-code",
+    "codex",
+    "agent-skills"
+  ],
+  "dependencies": {
+    "@mindbricks/mind-set": "^0.1.0"
+  }
+}

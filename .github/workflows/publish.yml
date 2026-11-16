@@ -1,0 +1,34 @@
+name: publish
+
+# A release is a tag v<version> whose version equals package.json. The tests run
+# first; the package goes to npm with provenance. genesis-set depends on
+# mind-set, so the mind-set range it declares must already be on npm.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - name: tag matches package.json
+        run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
+      - name: the mind-set range is published
+        run: |
+          range="$(node -p "require('./package.json').dependencies['@mindbricks/mind-set']")"
+          found="$(npm view "@mindbricks/mind-set@${range}" version --json 2>/dev/null || true)"
+          test -n "$found" || { echo "@mindbricks/mind-set ${range} is not on npm yet: publish mind-set first"; exit 1; }
+          echo "@mindbricks/mind-set ${range} on npm: ${found}"
+      - run: npm test
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
