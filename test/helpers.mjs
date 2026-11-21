@@ -24,11 +24,12 @@ export function cleanup() {
   for (const dir of tempRoots.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 }
 
-/** A package folder with this checkout's bin/ and lib/, the given version and mind-set range, and the fixture corpus and skills. */
+/** A package folder with this checkout's bin/, lib/ and mcp/, the given version and mind-set range, and the fixture corpus and skills. */
 export function makePackage(version = '0.1.0', { range = '^0.1.0' } = {}) {
   const root = tempDir('genesis-set-pkg-');
   fs.cpSync(path.join(PKG_DIR, 'bin'), path.join(root, 'bin'), { recursive: true });
   fs.cpSync(path.join(PKG_DIR, 'lib'), path.join(root, 'lib'), { recursive: true });
+  fs.cpSync(path.join(PKG_DIR, 'mcp'), path.join(root, 'mcp'), { recursive: true });
   const pkg = JSON.parse(fs.readFileSync(path.join(PKG_DIR, 'package.json'), 'utf8'));
   fs.writeFileSync(
     path.join(root, 'package.json'),

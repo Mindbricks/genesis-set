@@ -1,4 +1,4 @@
-# genesis-set corpus (pre-release)
+# genesis-set corpus
 
 The documents the genesis-set skills read. `genesis-set install` copies this folder to
 `~/.genesis-set/<version>/` and links it as `~/.genesis-set/current`; every skill names its
@@ -11,11 +11,15 @@ procedure.
 
 ```
 genesis/
-  compiler-api.md        the Genesis Compiler API (pre-release: not reachable yet)
+  compiler-api.md        the Genesis Compiler API and its genesis_* tools
+  compile-results.md     reading a service build: statuses, job fields, failure codes
+  custom-code.md         extending the generated code: LIB, API, dbLayer, edge controllers
+  run-locally.md         running and debugging the generated services on your machine
+  testing.md             the API test suite, the test transport, the sample-data seed
+  deploy.md              deploying with your own login: docker-compose, Railway, Fly.io, Render (Genesis never deploys)
+  pitfalls.md            compiler facts that look like bugs
   procedures/            Genesis additions to the mind-set procedures, one file per
     README.md            procedure that has Genesis-specific steps, and their index
 ```
 
-The Genesis Compiler API is not reachable yet; the generated-code knowledge in
-`genesis/procedures/` already describes what the Genesis compiler produces today. Do not
-edit the files here: a new `genesis-set update` replaces them.
+Do not edit the files here: a new `genesis-set update` replaces them.

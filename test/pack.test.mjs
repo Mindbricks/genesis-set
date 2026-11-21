@@ -59,7 +59,7 @@ describe('npm pack, installed from the tarball', { skip: PACKAGE ? false : 'no b
   test('the tarball holds the package and not the tests', () => {
     const [info] = JSON.parse(npm(['pack', PACKAGE, '--json', '--pack-destination', work], work));
     const files = new Set(info.files.map((f) => f.path));
-    for (const f of ['package.json', 'bin/genesis-set.mjs', 'lib/install.mjs', 'lib/semver.mjs', 'LICENSE', 'README.md', 'CHANGELOG.md', 'corpus/README.md', 'corpus/genesis/compiler-api.md', 'corpus/genesis/procedures/README.md']) {
+    for (const f of ['package.json', 'bin/genesis-set.mjs', 'lib/install.mjs', 'lib/semver.mjs', 'lib/mcp-config.mjs', 'lib/config-cli.mjs', 'mcp/server.mjs', 'mcp/tools.mjs', 'mcp/client.mjs', 'mcp/config.mjs', 'mcp/blueprint.mjs', 'LICENSE', 'README.md', 'CHANGELOG.md', 'corpus/README.md', 'corpus/genesis/compiler-api.md', 'corpus/genesis/procedures/README.md']) {
       assert.ok(files.has(f), `${f} is not in the tarball`);
     }
     const skills = skillsOf(PACKAGE);
@@ -95,6 +95,10 @@ describe('npm pack, installed from the tarball', { skip: PACKAGE ? false : 'no b
       }
     }
     assert.ok(exists(mindSet));
+    const mcpServer = path.join(home, '.genesis-set', 'mcp', 'server.mjs');
+    assert.ok(exists(mcpServer), 'the MCP server is copied');
+    assert.equal(readJson(path.join(home, '.claude.json')).mcpServers.genesis.args[0], mcpServer);
+    assert.ok(fs.readFileSync(path.join(home, '.codex', 'config.toml'), 'utf8').includes(JSON.stringify(mcpServer)));
     const doc = run(installed, home, ['doctor']);
     assert.equal(doc.code, 0, doc.stdout + doc.stderr);
     assert.match(doc.stdout, /compatible/);

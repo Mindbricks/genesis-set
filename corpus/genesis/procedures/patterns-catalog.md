@@ -9,4 +9,4 @@ generates, and the Genesis Compiler API steps.
 
 Instead of the mind-set step that starts "| Each user or tenant brings their OWN AI key (BYOK) | ...":
 
-| Each user or tenant brings their OWN AI key (BYOK) | `AiProvider.credentialScopes` | nodejs (dotnet and java: tenant and user levels); never a key column or custom variable; `pitfalls.md` section 7 |
+| Each user or tenant brings their OWN AI key (BYOK) | `AiProvider.credentialScopes` | nodejs, python, rust (user, tenant, workspace levels); dotnet, java, golang (user and tenant levels); never a key column or custom variable; `pitfalls.md` section 7 |

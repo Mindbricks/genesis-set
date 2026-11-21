@@ -1,40 +1,56 @@
 ---
 name: genesis-compiler-api
-description: PRE-RELEASE. Compile a validated OpenAPPL blueprint into service code with the Genesis Compiler API (validate, start a build, follow it, cancel it) and report what each service build produced. Use it after the blueprint is written and validated with mind-set, when the user wants generated code. Do not use it to design or write the blueprint (the mind-set openappl-blueprint-* skills) or to run the generated services (genesis-generated-code).
+description: PRE-RELEASE. Compile a validated OpenAPPL blueprint into service code with the Genesis Compiler API through the genesis_* MCP tools (genesis_validateApplication, genesis_validateService, genesis_buildService, genesis_getServiceBuild, genesis_getBuilds), follow each service build and report what it produced. Use it after the blueprint is written and validated with mind-set, when the user wants generated code, deploy files or the status of a build. Do not use it to design or write the blueprint (the mind-set openappl-blueprint-* skills), to run or test the generated services (genesis-run-and-test) or to deploy them (genesis-deploy).
 ---
 
 # Genesis Compiler API
 
-> **Pre-release.** The Genesis Compiler API is not reachable yet. Read the guide so you can
-> explain what compiling will do, but do not claim a validation or a build happened. When a
-> call cannot be made, say so plainly and stop there.
+> **Builds are dry runs for now:** the code is generated and measured, nothing is pushed. When a
+> tool answers `GENESIS_UNREACHABLE`, say so plainly and stop: never claim a validation or a
+> build happened.
 
-The guide is `{{CORPUS}}/genesis/compiler-api.md`. Read it fully before the first call.
+The guide is `{{CORPUS}}/genesis/compiler-api.md`. Read it fully before the first call. Reading a
+service build's result is `{{CORPUS}}/genesis/compile-results.md`.
 
 ## Before you call
 
-1. The blueprint is written and validated with mind-set (the openappl-blueprint-authoring
-   skill and `mind-set validate blueprint.json`, schema `{{MIND_SET}}/openappl.json`).
-2. The project identity is the blueprint's: the codename is
-   `projectSettings.basicSettings.name`. Do not create a binding file or any other file in
-   the project folder for the compiler.
-3. The API key is in the environment variable `GENESIS_API_KEY`. If it is not set, ask the
-   user to set it in their shell; never ask them to paste it into a file, the blueprint or
-   the chat, and never print it.
+1. The blueprint is written and validated with mind-set (the openappl-blueprint-authoring skill
+   and `mind-set validate blueprint.json`, schema `{{MIND_SET}}/openappl.json`). Follow the
+   mind-set procedure `{{MIND_SET}}/procedures/project-lifecycle.md` with its Genesis additions
+   `{{CORPUS}}/genesis/procedures/project-lifecycle.md`.
+2. Identity is the blueprint's: the codename is `projectSettings.basicSettings.name`; a new
+   blueprint gets a stable project id (a UUID) once. Write no binding file or other compiler file
+   into the project folder.
+3. The `genesis_*` tools are there (the MCP server `genesis`; `genesis-set install` registers it,
+   then restart the agent). A call that answers `GENESIS_API_KEY_MISSING` carries the message that
+   tells the user where to create the key (the Genesis portal's API keys page) and how to set it
+   (`GENESIS_API_KEY`, or `genesis-set config set-key` in their own terminal): pass it on. The
+   easiest way for the user is the local key page: `genesis_requestKey` with
+   `name: "genesis-api-key"` answers its link; then check `genesis_listKeys`. Never ask for the key
+   in the chat, never write it into a file, never print it.
 
 ## The calls
 
-1. `POST /validate` with the whole blueprint inline; fix every error, judge every warning.
-2. `POST /builds` with a fresh `Idempotency-Key`, the services to compile and
-   `"dryRun": true` (the only mode at opening). Compile `auth` first when the domain
-   services read its shape; compile each other service once, after the whole blueprint
-   validates.
-3. Follow `GET /builds/:id` with a growing interval until the build is `succeeded`,
-   `partial`, `failed` or `cancelled`. Retry a failed request with the SAME key.
-4. Report per service: status, added / deleted lines, files, and every error code.
+1. `genesis_validateApplication` with `blueprintPath` (absolute). Fix every error, judge every
+   warning. While iterating on one service, `genesis_validateService` with `fragmentPath` is the
+   fast loop; `notChecked` is not a pass, so finish with the whole blueprint.
+2. Author everything and validate everything first, then compile each service once. During the
+   dry-run release the line counts are estimates and no credit is charged. Compile `auth` first
+   when the others or the tests need it.
+3. `genesis_buildService` per service, with `deployTargets` when the user wants deploy files.
+   Keep the returned `idempotencyKey`; after a lost answer, call again with the same key and the
+   same arguments (never a second build).
+4. `genesis_getServiceBuild` with the `jobId`: 5 s, 10 s, then every 30 s, until `succeeded`,
+   `failed` or `cancelled`. Never report a build you did not see finish.
+5. Report per service: status, added / deleted lines, files, deploy artifacts, every error code.
+   A failure is a blueprint fault (fix, validate, compile that service again) or a compiler fault
+   (report it with the job id and the exact error).
+6. `genesis_getBuilds` finds earlier builds and their job ids (filter by `codename`).
+7. Start the run-and-test skill when the matching generated service repositories are available.
+   A successful dry run provides a report and inventory. It leaves no checkout or local deploy files.
 
 ## Not available yet
 
-Validating one service, per-service build jobs, listing builds, pushing to your own git,
-deploy artifacts, credit, and the local `genesis_*` MCP tools are announced but not
-available: the guide's section 5 lists them. Do not call them.
+Reading the blueprint from git (`repo`), pushing to the user's repositories (direct or pull
+request), credit and usage: the guide's section 10. Do
+not call them; say so when asked.

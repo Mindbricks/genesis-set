@@ -145,7 +145,7 @@ describe('update, uninstall, doctor', () => {
     assert.equal(res.code, 0, res.stdout + res.stderr);
     assert.match(res.stdout, /genesis-set 0\.1\.0 \(this package\)/);
     assert.match(res.stdout, /mind-set: 0\.1\.0 at .*; genesis-set needs \^0\.1\.0: compatible/);
-    assert.match(res.stdout, /GENESIS_API_KEY is not set/);
+    assert.match(res.stdout, /Genesis Compiler API key: not set \(GENESIS_API_KEY/);
     assert.match(res.stdout, /genesis-set skills: genesis-demo-api \(0\.1\.0\), genesis-demo-code \(0\.1\.0\)/);
     assert.match(res.stdout, /mind-set skills: openappl-demo \(0\.1\.0\)/);
   });
