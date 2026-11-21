@@ -16,24 +16,25 @@ mind-set when it is missing. Node 18 or newer.
 
 ```bash
 npm install -g @mindbricks/genesis-set
-genesis-set install
+genesis install
 ```
 
-The npm package is `@mindbricks/genesis-set`; the command is `genesis-set`. It depends on
+The npm package is `@mindbricks/genesis-set`; the command is `genesis` (`genesis-set` still works
+as an alias). It depends on
 `@mindbricks/mind-set`, so the global install brings mind-set's package too, and
-`genesis-set install` runs `mind-set install` when mind-set is not installed yet.
+`genesis install` runs `mindset install` when mind-set is not installed yet.
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `genesis-set install [--claude] [--codex] [--force] [--no-mcp] [--no-key] [--dry-run]` | Makes sure a compatible mind-set is installed (it comes with this package and is installed by its own CLI), copies the corpus to `~/.genesis-set/<version>/` (linked as `~/.genesis-set/current`), writes each `genesis-*` skill to Claude Code (`~/.claude/skills/`) and Codex (`~/.agents/skills/`), registers the MCP server (below), and ends with the API key step (below). |
-| `genesis-set update [...]` | Installs this version for every agent installed before (and every detected one), then deletes older corpus versions. |
-| `genesis-set uninstall [--dry-run]` | Removes only what `install` recorded in `~/.genesis-set/installed.json`, including the MCP registrations. mind-set and your API key file stay. |
-| `genesis-set doctor` | Both versions (genesis-set and mind-set) and whether they are compatible, the skills of each package and the MCP server per agent, where the API key comes from (never its value) and the API base. |
-| `genesis-set config [show \| set-key \| unset-key \| set-base <url> \| unset-base]` | The API key and API base in `~/.genesis-set/config.json` (mode 0600). `set-key` reads the key from stdin (hidden on a terminal), never from the command line. |
-| `genesis-set keys [--no-open]` | Opens the local key page in your browser: add, change, clear or delete the keys your agent uses. The link is new each time; the page closes after 15 idle minutes or on Ctrl+C. `--no-open` only prints the link. |
-| `genesis-set mcp` | Runs the MCP server on stdio from the package (for a registration by hand). |
+| `genesis install [--claude] [--codex] [--force] [--no-mcp] [--no-key] [--dry-run]` | Makes sure a compatible mind-set is installed (it comes with this package and is installed by its own CLI), copies the corpus to `~/.genesis-set/<version>/` (linked as `~/.genesis-set/current`), writes each `genesis-*` skill to Claude Code (`~/.claude/skills/`) and Codex (`~/.agents/skills/`), registers the MCP server (below), and ends with the API key step (below). |
+| `genesis update [...]` | Installs this version for every agent installed before (and every detected one), then deletes older corpus versions. |
+| `genesis uninstall [--dry-run]` | Removes only what `install` recorded in `~/.genesis-set/installed.json`, including the MCP registrations. mind-set and your API key file stay. |
+| `genesis doctor` | Both versions (genesis-set and mind-set) and whether they are compatible, the skills of each package and the MCP server per agent, where the API key comes from (never its value) and the API base. |
+| `genesis config [show \| set-key \| unset-key \| set-base <url> \| unset-base]` | The API key and API base in `~/.genesis-set/config.json` (mode 0600). `set-key` reads the key from stdin (hidden on a terminal), never from the command line. |
+| `genesis keys [--no-open]` | Opens the local key page in your browser: add, change, clear or delete the keys your agent uses. The link is new each time; the page closes after 15 idle minutes or on Ctrl+C. `--no-open` only prints the link. |
+| `genesis mcp` | Runs the MCP server on stdio from the package (for a registration by hand). |
 
 ### The MCP server
 
@@ -76,7 +77,7 @@ without a Genesis API key:
   2. "Open this link and save the key there".
   3. `genesis_listKeys` until the key is `set`.
   4. `genesis_writeKeyToEnvFile` when a service needs it.
-- **Opening the page yourself:** `genesis-set keys` in any terminal opens it in the browser. The
+- **Opening the page yourself:** `genesis keys` in any terminal opens it in the browser. The
   port and the link change every time, so there is nothing to remember or bookmark. Asking the
   agent ("open my keys") works too: it calls `genesis_openKeyManager`.
 - **Where the keys live:** in `~/.genesis-set/config.json` (mode 0600).
@@ -114,18 +115,18 @@ without a Genesis API key:
 - **Getting the key:** the user signs in to the Genesis portal and creates one on its API keys
   page, `https://portal.genesiscompiler.com/keys` (the stage API `sapi.genesiscompiler.com`
   has `https://stage.genesiscompiler.com/keys`). The key is shown once.
-- **The install key step:** with no key set, `genesis-set install` names that page.
+- **The install key step:** with no key set, `genesis install` names that page.
   - On a terminal it reads the key with hidden input and stores it as `set-key` does; Enter
     skips.
   - Without a terminal (an agent runs the install) it only prints the page and the command, and
     never waits.
   - `--no-key` skips the step.
 - The Compiler API key lives in the environment variable `GENESIS_API_KEY` or in
-  `~/.genesis-set/config.json` (`genesis-set config set-key`), never in a file of the project,
+  `~/.genesis-set/config.json` (`genesis config set-key`), never in a file of the project,
   the blueprint or a commit. The environment variable wins. The MCP server never reads the
   folder it runs in for a key or a setting.
 - The API base is `https://api.genesiscompiler.com` unless `GENESIS_API_BASE` or
-  `genesis-set config set-base` says otherwise; a plain-http base is accepted only on a
+  `genesis config set-base` says otherwise; a plain-http base is accepted only on a
   loopback address.
 
 ### Environment

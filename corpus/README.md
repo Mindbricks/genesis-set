@@ -1,6 +1,6 @@
 # genesis-set corpus
 
-The documents the genesis-set skills read. `genesis-set install` copies this folder to
+The documents the genesis-set skills read. `genesis install` copies this folder to
 `~/.genesis-set/<version>/` and links it as `~/.genesis-set/current`; every skill names its
 files by their absolute path in that copy.
 
@@ -22,4 +22,4 @@ genesis/
     README.md            procedure that has Genesis-specific steps, and their index
 ```
 
-Do not edit the files here: a new `genesis-set update` replaces them.
+Do not edit the files here: a new `genesis update` replaces them.

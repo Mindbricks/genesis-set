@@ -323,7 +323,7 @@ describe('the API key', () => {
       assert.equal(r.isError, true);
       assert.equal(r.data.error.code, 'GENESIS_API_KEY_MISSING');
       assert.match(r.data.error.message, /GENESIS_API_KEY/);
-      assert.match(r.data.error.message, /genesis-set config set-key/);
+      assert.match(r.data.error.message, /genesis config set-key/);
       assert.match(r.data.error.message, /portal\.genesiscompiler\.com\/keys/);
       assert.match(r.data.error.message, /Never put the key in the project folder/);
     }

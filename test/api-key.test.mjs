@@ -1,4 +1,4 @@
-// Where a user gets the Genesis API key, and the key step of `genesis-set install` (#9351):
+// Where a user gets the Genesis API key, and the key step of `genesis install` (#9351):
 // the portal link in every key message, the hidden prompt on a terminal, the printed link
 // without one, and the key never printed.
 
@@ -41,7 +41,7 @@ describe('the portal keys page', () => {
   test('the missing-key message names the page and keeps the never-in-the-chat rule', () => {
     const m = missingKeyMessage('/x/config.json', 'https://sapi.genesiscompiler.com');
     assert.match(m, /stage\.genesiscompiler\.com\/keys/);
-    assert.match(m, /genesis-set config set-key/);
+    assert.match(m, /genesis config set-key/);
     assert.match(m, /Never put the key in the project folder, the blueprint, a commit or the chat/);
     assert.match(missingKeyMessage('/x/config.json'), /portal\.genesiscompiler\.com\/keys/);
   });
@@ -67,7 +67,7 @@ describe('the install key step', () => {
     const c = capture();
     await offerApiKey({ env: h.env, out: c.out, err: c.err, interactive: true, readSecret: async () => '' });
     assert.ok(!fs.existsSync(configFile(h)));
-    assert.match(c.lines.out.join('\n'), /Skipped\. Later: "genesis-set config set-key"/);
+    assert.match(c.lines.out.join('\n'), /Skipped\. Later: "genesis config set-key"/);
   });
 
   test('a key with whitespace inside is refused without failing the install', async () => {
@@ -123,6 +123,6 @@ describe('the CLI', () => {
     assert.equal(res.code, 0, res.stdout + res.stderr);
     assert.match(res.stdout, /stage\.genesiscompiler\.com\/keys/);
     const doc = run(pkg, h, ['doctor'], { mindSet: makeMindSet(), env });
-    assert.match(doc.stdout, /not set \(GENESIS_API_KEY, or "genesis-set config set-key"; create one at https:\/\/stage\.genesiscompiler\.com\/keys\)/);
+    assert.match(doc.stdout, /not set \(GENESIS_API_KEY, or "genesis config set-key"; create one at https:\/\/stage\.genesiscompiler\.com\/keys\)/);
   });
 });

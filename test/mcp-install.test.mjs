@@ -1,5 +1,5 @@
-// `genesis-set install` registers the MCP server with Claude Code and Codex at
-// user scope (#9183), `uninstall` removes exactly that, and `genesis-set config`
+// `genesis install` registers the MCP server with Claude Code and Codex at
+// user scope (#9183), `uninstall` removes exactly that, and `genesis config`
 // keeps the API key in the home config file (0600) without ever printing it.
 
 import assert from 'node:assert/strict';
@@ -159,7 +159,7 @@ describe('MCP registration at install', () => {
   });
 });
 
-describe('genesis-set config', () => {
+describe('genesis config', () => {
   const cfgFile = (home) => path.join(home, '.genesis-set', 'config.json');
   const runIn = (pkg, home, args, input) =>
     spawnSync(process.execPath, [path.join(pkg, 'bin', 'genesis-set.mjs'), ...args], {

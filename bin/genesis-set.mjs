@@ -14,17 +14,17 @@ const pkg = JSON.parse(fs.readFileSync(path.join(pkgRoot, 'package.json'), 'utf8
 const out = (line) => process.stdout.write(`${line}\n`);
 const err = (line) => process.stderr.write(`${line}\n`);
 
-const HELP = `genesis-set ${pkg.version}: Genesis compiler skills for coding agents (PRE-RELEASE)
+const HELP = `genesis ${pkg.version}: Genesis compiler skills for coding agents (PRE-RELEASE; genesis-set is an alias)
 
 Usage:
-  genesis-set install [--claude] [--codex] [--force] [--no-mcp] [--no-key] [--dry-run]
-  genesis-set update [--claude] [--codex] [--force] [--no-mcp] [--dry-run]
-  genesis-set uninstall [--dry-run]
-  genesis-set doctor
-  genesis-set config [show | set-key | unset-key | set-base <url> | unset-base]
-  genesis-set keys [--no-open]
-  genesis-set mcp
-  genesis-set --version | --help
+  genesis install [--claude] [--codex] [--force] [--no-mcp] [--no-key] [--dry-run]
+  genesis update [--claude] [--codex] [--force] [--no-mcp] [--dry-run]
+  genesis uninstall [--dry-run]
+  genesis doctor
+  genesis config [show | set-key | unset-key | set-base <url> | unset-base]
+  genesis keys [--no-open]
+  genesis mcp
+  genesis --version | --help
 
 install    makes sure mind-set ${pkg.dependencies?.['@mindbricks/mind-set'] ?? ''} is installed (installs the
            mind-set that comes with this package when it is missing or older),
@@ -101,7 +101,7 @@ async function main(argv) {
     return command || flags.help ? 0 : 2;
   }
   if (!KNOWN_FLAGS[command]) {
-    err(`error: unknown command "${command}" (see genesis-set --help)`);
+    err(`error: unknown command "${command}" (see genesis --help)`);
     return 2;
   }
   const unknown = Object.keys(flags).filter((f) => !KNOWN_FLAGS[command].includes(f));

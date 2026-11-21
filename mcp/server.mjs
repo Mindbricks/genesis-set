@@ -4,10 +4,10 @@
 // per line on stdin / stdout, logs on stderr only. No dependencies besides
 // Node >= 18.
 //
-// `genesis-set install` copies this folder to ~/.genesis-set/mcp/ and registers
-// it with each installed agent; `genesis-set mcp` runs it from the package.
+// `genesis install` copies this folder to ~/.genesis-set/mcp/ and registers
+// it with each installed agent; `genesis mcp` runs it from the package.
 // The API key and the API base are resolved on every call (./config.mjs), so a
-// key stored with `genesis-set config set-key` works without a restart.
+// key stored with `genesis config set-key` works without a restart.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -103,7 +103,7 @@ export function serve({ input = process.stdin, output = process.stdout, log = (l
         inflight.set(msg.id, ctl);
         try {
           const settings = { ...resolveSettings(env), env, cwd, userAgent: `genesis-set/${version} (mcp)` };
-          for (const p of settings.problems) log(`genesis-set mcp: ${p}`);
+          for (const p of settings.problems) log(`genesis mcp: ${p}`);
           const result = await runTool(name, params.arguments, settings, ctl.signal);
           if (!ctl.signal.aborted) reply(msg.id, result);
         } finally {
@@ -119,7 +119,7 @@ export function serve({ input = process.stdin, output = process.stdout, log = (l
 
   const dispatch = (msg) => {
     handle(msg).catch((err) => {
-      log(`genesis-set mcp: ${err?.stack ?? err}`);
+      log(`genesis mcp: ${err?.stack ?? err}`);
       if (msg?.id !== undefined && msg?.id !== null) fail(msg.id, -32603, 'Internal error');
     });
   };

@@ -30,7 +30,7 @@ function authHint(status, configFile) {
   if (status === 401) {
     return (
       'The Genesis API did not accept the API key. Check the key in the Genesis portal and set the right one ' +
-      `(GENESIS_API_KEY, or "genesis-set config set-key", which writes ${configFile}).`
+      `(GENESIS_API_KEY, or "genesis config set-key", which writes ${configFile}).`
     );
   }
   if (status === 403) return 'This key is not allowed to call the Genesis Compiler API (a user API key is needed).';

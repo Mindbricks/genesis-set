@@ -15,16 +15,16 @@ service build's result is `{{CORPUS}}/genesis/compile-results.md`.
 ## Before you call
 
 1. The blueprint is written and validated with mind-set (the openappl-blueprint-authoring skill
-   and `mind-set validate blueprint.json`, schema `{{MIND_SET}}/openappl.json`). Follow the
+   and `mindset validate blueprint.json`, schema `{{MIND_SET}}/openappl.json`). Follow the
    mind-set procedure `{{MIND_SET}}/procedures/project-lifecycle.md` with its Genesis additions
    `{{CORPUS}}/genesis/procedures/project-lifecycle.md`.
 2. Identity is the blueprint's: the codename is `projectSettings.basicSettings.name`; a new
    blueprint gets a stable project id (a UUID) once. Write no binding file or other compiler file
    into the project folder.
-3. The `genesis_*` tools are there (the MCP server `genesis`; `genesis-set install` registers it,
+3. The `genesis_*` tools are there (the MCP server `genesis`; `genesis install` registers it,
    then restart the agent). A call that answers `GENESIS_API_KEY_MISSING` carries the message that
    tells the user where to create the key (the Genesis portal's API keys page) and how to set it
-   (`GENESIS_API_KEY`, or `genesis-set config set-key` in their own terminal): pass it on. The
+   (`GENESIS_API_KEY`, or `genesis config set-key` in their own terminal): pass it on. The
    easiest way for the user is the local key page: `genesis_requestKey` with
    `name: "genesis-api-key"` answers its link; then check `genesis_listKeys`. Never ask for the key
    in the chat, never write it into a file, never print it.

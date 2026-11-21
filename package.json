@@ -1,6 +1,6 @@
 {
   "name": "@mindbricks/genesis-set",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "PRE-RELEASE. Genesis compiler skills for coding agents (Claude Code, Codex): the generated code, its runtime and the Genesis Compiler API, on top of mind-set.",
   "license": "Apache-2.0",
   "repository": {
@@ -13,6 +13,7 @@
   },
   "type": "module",
   "bin": {
+    "genesis": "bin/genesis-set.mjs",
     "genesis-set": "bin/genesis-set.mjs"
   },
   "files": [
@@ -40,6 +41,6 @@
     "agent-skills"
   ],
   "dependencies": {
-    "@mindbricks/mind-set": "^0.1.0"
+    "@mindbricks/mind-set": "^0.2.0"
   }
 }

@@ -189,7 +189,7 @@ const HANDLERS = {
         key.status === 'set'
           ? `"${key.label}" is already set. Use it; the user can change it on the key page.`
           : `Ask the user to open ${link.url} on this machine and save "${key.label}" there, then call genesis_listKeys to see it set. ` +
-            'Never ask for the value in the chat. Later the user can open the page themselves with "genesis-set keys" in a terminal.',
+            'Never ask for the value in the chat. Later the user can open the page themselves with "genesis keys" in a terminal.',
     };
   },
   async genesis_listKeys(_args, settings) {

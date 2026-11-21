@@ -1,6 +1,6 @@
 // The local key store of genesis-set (#9352): the keys a coding agent needs (the
 // Genesis API key, provider keys for the generated services), kept in the
-// genesis-set config file (<data>/config.json, mode 0600) next to the API key.
+// genesis config file (<data>/config.json, mode 0600) next to the API key.
 //
 //   apiKey                 the Genesis API key; shown as the built-in key
 //                          "genesis-api-key"

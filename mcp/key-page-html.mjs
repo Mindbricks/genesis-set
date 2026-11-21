@@ -250,7 +250,7 @@ export function renderKeyPage({ nonce, idleMinutes = 15, expired = false }) {
     return (
       head +
       '<body><main class="expired"><h1>This link has expired</h1>' +
-      '<p class="lead">The key page closes when it is idle or when the agent session ends. Run <code>genesis-set keys</code> in a terminal for a new one, or ask the agent.</p>' +
+      '<p class="lead">The key page closes when it is idle or when the agent session ends. Run <code>genesis keys</code> in a terminal for a new one, or ask the agent.</p>' +
       '</main></body></html>'
     );
   }
@@ -269,7 +269,7 @@ export function renderKeyPage({ nonce, idleMinutes = 15, expired = false }) {
     '<div class="row"><textarea name="description" placeholder="What it is for and where to get it" aria-label="Description"></textarea></div>' +
     '<div class="row"><button class="primary" type="submit">Add key</button></div>' +
     '</form></section>' +
-    `<footer>This page runs on 127.0.0.1 inside genesis-set and closes after ${idleMinutes} idle minutes. Open it again any time with <code>genesis-set keys</code> in a terminal.</footer>` +
+    `<footer>This page runs on 127.0.0.1 inside genesis-set and closes after ${idleMinutes} idle minutes. Open it again any time with <code>genesis keys</code> in a terminal.</footer>` +
     `</main><script nonce="${nonce}">${SCRIPT}</script></body></html>`
   );
 }

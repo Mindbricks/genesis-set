@@ -11,7 +11,7 @@ Instead of the mind-set step that starts "## 8. Validate Validate the blueprint 
 
 #### 8. Validate, then verify the running service - the ladder
 
-Validate every module you touched (`mind-set validate`, then the Genesis
+Validate every module you touched (`mindset validate`, then the Genesis
 Compiler API's validation), compile, and start the service. Then climb,
 recording what you OBSERVED per rung; log a rung you could not climb as a
 finding, not as success.

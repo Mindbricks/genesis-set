@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, describe, test } from 'node:test';
-import { cleanup, exists, makeHome, makeMindSet, makePackage, readJson, run } from './helpers.mjs';
+import { PKG_DIR, cleanup, exists, makeHome, makeMindSet, makePackage, readJson, run } from './helpers.mjs';
 
 after(cleanup);
 
@@ -182,5 +182,13 @@ describe('update, uninstall, doctor', () => {
     const res = run(pkg, makeHome({ claude: true }), ['install'], { mindSet: makeMindSet() });
     assert.equal(res.code, 1);
     assert.match(res.stdout, /skill names must start with "genesis-": openappl-demo/);
+  });
+});
+
+describe('the command name', () => {
+  test('the command is genesis; genesis-set stays an alias of the same CLI', () => {
+    const pkg = readJson(path.join(PKG_DIR, 'package.json'));
+    assert.deepEqual(Object.keys(pkg.bin).sort(), ['genesis', 'genesis-set']);
+    assert.equal(pkg.bin.genesis, pkg.bin['genesis-set']);
   });
 });

@@ -3,6 +3,16 @@
 The package follows semantic versioning. Each release names the mind-set range it needs
 (`dependencies["@mindbricks/mind-set"]` in `package.json`).
 
+## 0.2.0 (pre-release)
+
+Needs mind-set `^0.2.0`.
+
+- The command is `genesis`, the same name as its MCP server; `genesis-set` still works as an
+  alias (and keeps `npx @mindbricks/genesis-set ...` working). Every message, skill and
+  guide names `genesis`. The data folder stays `~/.genesis-set`.
+- The MCP server exits only after its answers are written out; before, an answer over 8 KiB
+  could be cut when the client closed stdin.
+
 ## 0.1.0 (pre-release)
 
 First version, published with the Genesis Compiler API open for dry-run builds.

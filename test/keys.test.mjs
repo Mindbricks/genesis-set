@@ -284,7 +284,7 @@ describe('the key tools', () => {
   });
 });
 
-describe('genesis-set keys', () => {
+describe('genesis keys', () => {
   test('prints a fresh link, serves the page until Ctrl+C, then closes it', { skip: process.platform === 'win32' && 'Windows has no SIGINT for a child process' }, async () => {
     const h = home();
     const child = spawn(process.execPath, [path.join(PKG_DIR, 'bin', 'genesis-set.mjs'), 'keys', '--no-open'], {
@@ -305,7 +305,7 @@ describe('genesis-set keys', () => {
     const p = pageParts(url);
     const page = await raw(p.port, { pathName: `/?t=${p.token}`, headers: { host: `127.0.0.1:${p.port}` } });
     assert.equal(page.status, 200);
-    assert.match(page.text, /genesis-set keys/);
+    assert.match(page.text, /genesis keys/);
     const exited = new Promise((resolve) => child.on('exit', (code) => resolve(code)));
     child.kill('SIGINT');
     assert.equal(await exited, 0);

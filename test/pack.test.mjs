@@ -13,7 +13,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, describe, test } from 'node:test';
-import { FIXTURES, PKG_DIR, cleanup, exists, makeHome, readJson, run, tempDir } from './helpers.mjs';
+import { PKG_DIR, cleanup, exists, makeHome, makeMindSet, readJson, run, tempDir } from './helpers.mjs';
 
 after(cleanup);
 
@@ -68,7 +68,10 @@ describe('npm pack, installed from the tarball', { skip: PACKAGE ? false : 'no b
     assert.ok(![...files].some((f) => f.startsWith('test/')), 'the tests are in the tarball');
     assert.match(fs.readFileSync(path.join(PACKAGE, 'README.md'), 'utf8'), /PRE-RELEASE/);
 
-    const [ms] = JSON.parse(npm(['pack', path.join(FIXTURES, 'mind-set'), '--json', '--pack-destination', work], work));
+    // The fake mind-set takes the lowest version the package's range accepts, so the install
+    // stays offline whatever mind-set version genesis-set needs (^0.2.0 since 0.2.0).
+    const range = readJson(path.join(PACKAGE, 'package.json')).dependencies['@mindbricks/mind-set'];
+    const [ms] = JSON.parse(npm(['pack', makeMindSet(String(range).replace(/^[~^>=\s]+/, '')), '--json', '--pack-destination', work], work));
     const project = path.join(work, 'project');
     fs.mkdirSync(project);
     fs.writeFileSync(path.join(project, 'package.json'), '{ "name": "probe", "private": true }\n');

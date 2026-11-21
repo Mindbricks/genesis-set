@@ -41,15 +41,15 @@ Genesis never deploys anything and never runs your services.
 
 ## 3. Setup
 
-1. `genesis-set install` registers the MCP server `genesis` for Claude Code and Codex. Restart
+1. `genesis install` registers the MCP server `genesis` for Claude Code and Codex. Restart
    the agent afterwards so it loads the tools.
 2. The API key.
    - **Getting it:** the user creates it on the Genesis portal's API keys page,
      `https://portal.genesiscompiler.com/keys` (for the stage API `sapi.genesiscompiler.com`,
      `https://stage.genesiscompiler.com/keys`). It is shown once. Give the user that link.
-   - **Setting it:** the environment variable `GENESIS_API_KEY`, or `genesis-set config set-key`
+   - **Setting it:** the environment variable `GENESIS_API_KEY`, or `genesis config set-key`
      run by the user in their own terminal. That command reads the key from stdin and stores it
-     in `~/.genesis-set/config.json`, readable only by the user. `genesis-set install` offers the
+     in `~/.genesis-set/config.json`, readable only by the user. `genesis install` offers the
      same prompt at its end when it runs on a terminal.
    - **Easiest with an agent:** `genesis_requestKey` with `name: "genesis-api-key"` answers the
      local key page link; the user pastes the key there, and the genesis_* tools use it at once.
@@ -58,8 +58,8 @@ Genesis never deploys anything and never runs your services.
    - A call without a key answers `GENESIS_API_KEY_MISSING`. Its message names the portal page
      and how to set the key: pass it on as it is.
 3. The API base is `https://api.genesiscompiler.com`. Change it only when the user names
-   another one (`GENESIS_API_BASE`, or `genesis-set config set-base <url>`).
-4. `genesis-set doctor` says where the key comes from (never its value), the API base and
+   another one (`GENESIS_API_BASE`, or `genesis config set-base <url>`).
+4. `genesis doctor` says where the key comes from (never its value), the API base and
    whether each agent has the MCP server.
 
 ## 4. The tools
@@ -102,7 +102,7 @@ can be built).
 - `200 { "valid": true, "codename", "language", "blueprintHash", "services": [...] }`: `services`
   is the build order Genesis uses.
 - `422 { "valid": false, "error": { "code": "GENESIS_BLUEPRINT_INVALID", "details": { "errors", "warnings" } } }`:
-  every finding has `path`, `code` and `message`. Fix the blueprint, run `mind-set validate`
+  every finding has `path`, `code` and `message`. Fix the blueprint, run `mindset validate`
   again, then call again.
 - `429 GENESIS_RATE_LIMITED`: the validation budget (per user, per minute, shared with
   `genesis_validateService`) is spent; wait a minute. Do not loop on validation.
@@ -165,7 +165,7 @@ a `jobId` again after a lost session, and to show the user what was compiled.
 
 ## 5. How to compile a project
 
-1. Author the blueprint with mind-set and validate it with `mind-set validate blueprint.json`.
+1. Author the blueprint with mind-set and validate it with `mindset validate blueprint.json`.
 2. `genesis_validateApplication` with the whole blueprint; repair until it is valid. While you
    work on one service, `genesis_validateService` with its fragment is the fast loop; finish with
    the whole blueprint.
@@ -232,7 +232,7 @@ a `jobId` again after a lost session, and to show the user what was compiled.
 | `GENESIS_UNREACHABLE`, `GENESIS_TIMEOUT`, `GENESIS_BAD_RESPONSE` | local | The API did not answer properly. Say so; do not retry in a loop. A build retry reuses its key. |
 | `GENESIS_RATE_LIMITED` | 429 | Validation budget spent: wait a minute. |
 | `GENESIS_BLUEPRINT_INVALID` | 422 | Fix the findings in `details`. |
-| `GENESIS_BLUEPRINT_UNREADABLE` | 422 | The blueprint could not be loaded at all: check its structure with `mind-set validate`. |
+| `GENESIS_BLUEPRINT_UNREADABLE` | 422 | The blueprint could not be loaded at all: check its structure with `mindset validate`. |
 | `GENESIS_BLUEPRINT_TOO_LARGE`, `GENESIS_PAYLOAD_TOO_LARGE` | local, 413 | Over the size limit. |
 | `GENESIS_SERVICE_UNKNOWN`, `GENESIS_SERVICE_NOT_AVAILABLE` | 422 | Wrong service name, or panel / sdk. |
 | `GENESIS_LANGUAGE_NOT_ALLOWED`, `GENESIS_LANGUAGE_NOT_SUPPORTED` | 422 | Use a language the API lists (today `nodejs` and `rust`). |

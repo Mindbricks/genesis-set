@@ -158,7 +158,7 @@ export function missingKeyMessage(configFile, apiBase) {
   return (
     `No Genesis API key is set. The user creates one on the Genesis portal (${portalKeysUrl(apiBase)}; ` +
     'it is shown once) and sets it in the environment the agent starts from ' +
-    `(export ${API_KEY_ENV}=<your key>), or store it once with "genesis-set config set-key" ` +
+    `(export ${API_KEY_ENV}=<your key>), or store it once with "genesis config set-key" ` +
     `(it reads the key from stdin and writes ${configFile}, readable only by you). ` +
     'Never put the key in the project folder, the blueprint, a commit or the chat. ' +
     'The config file is read on every call; a new environment variable needs an agent restart.'
