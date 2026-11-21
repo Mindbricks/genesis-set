@@ -76,7 +76,7 @@ describe('the key store', () => {
     if (process.platform !== 'win32') assert.equal(fs.statSync(path.join(h.dir, '.genesis-set', 'config.json')).mode & 0o777, 0o600);
   });
 
-  test('a listing never carries a value; only a long value shows its last four characters', () => {
+  test('a listing never carries a value; only a long value shows its prefix and last four characters', () => {
     const h = home();
     requestKey(h.env, { name: 'long-key', label: 'Long' });
     requestKey(h.env, { name: 'short-key', label: 'Short' });
@@ -85,8 +85,8 @@ describe('the key store', () => {
     const rows = listKeys(h.env);
     assert.equal(rows[0].name, BUILTIN_KEY);
     assert.ok(!JSON.stringify(rows).includes(SECRET) && !JSON.stringify(rows).includes('fake-aaa'));
-    assert.equal(rows.find((r) => r.name === 'long-key').tail, 'bbbb');
-    assert.equal(rows.find((r) => r.name === 'short-key').tail, null);
+    assert.equal(rows.find((r) => r.name === 'long-key').masked, 'fake-value-...bbbb');
+    assert.equal(rows.find((r) => r.name === 'short-key').masked, null);
   });
 
   test('the built-in key is the Genesis API key: setting it is what the API tools read, and it cannot be deleted', () => {
@@ -256,7 +256,7 @@ describe('the key tools', () => {
 
     const listed = await s.call('genesis_listKeys', {});
     assert.equal(listed.data.keys.find((k) => k.name === 'stripe-secret-key').status, 'set');
-    assert.ok(!listed.text.includes('fake a') && !listed.text.includes('"tail"'), 'the agent sees no value and no tail');
+    assert.ok(!listed.text.includes('fake a') && !listed.text.includes('"masked"'), 'the agent sees no value and no masked form');
 
     fs.writeFileSync(path.join(project, '.dev.secrets.env'), 'OTHER=1\nSTRIPE_KEY=old\n');
     const wrote = await s.call('genesis_writeKeyToEnvFile', { name: 'stripe-secret-key', file: '.dev.secrets.env', variable: 'STRIPE_KEY' });

@@ -31,7 +31,7 @@ as an alias). It depends on
 | `genesis install [--claude] [--codex] [--force] [--no-mcp] [--no-key] [--dry-run]` | Makes sure a compatible mind-set is installed (it comes with this package and is installed by its own CLI), copies the corpus to `~/.genesis-set/<version>/` (linked as `~/.genesis-set/current`), writes each `genesis-*` skill to Claude Code (`~/.claude/skills/`) and Codex (`~/.agents/skills/`), registers the MCP server (below), and ends with the API key step (below). |
 | `genesis update [...]` | Installs this version for every agent installed before (and every detected one), then deletes older corpus versions. |
 | `genesis uninstall [--dry-run]` | Removes only what `install` recorded in `~/.genesis-set/installed.json`, including the MCP registrations. mind-set and your API key file stay. |
-| `genesis doctor` | Both versions (genesis-set and mind-set) and whether they are compatible, the skills of each package and the MCP server per agent, where the API key comes from (never its value) and the API base. |
+| `genesis doctor` | Both versions (genesis-set and mind-set) and whether they are compatible, the skills of each package and the MCP server per agent, where the API key comes from and which key it is (its type prefix and last four characters, such as `sk_mbx_...9f3a`, never the whole key) and the API base. |
 | `genesis config [show \| set-key \| unset-key \| set-base <url> \| unset-base]` | The API key and API base in `~/.genesis-set/config.json` (mode 0600). `set-key` reads the key from stdin (hidden on a terminal), never from the command line. |
 | `genesis keys [--no-open]` | Opens the local key page in your browser: add, change, clear or delete the keys your agent uses. The link is new each time; the page closes after 15 idle minutes or on Ctrl+C. `--no-open` only prints the link. |
 | `genesis mcp` | Runs the MCP server on stdio from the package (for a registration by hand). |
@@ -83,7 +83,8 @@ without a Genesis API key:
 - **Where the keys live:** in `~/.genesis-set/config.json` (mode 0600).
   - The Genesis API key is the built-in key `genesis-api-key`, the same value `config set-key` stores.
   - Every other key is `keys.<name>`.
-- **What the page shows:** whether a key is set, and the last four characters of a long value. A
+- **What the page shows:** whether a key is set and, for a long value, its type prefix and last
+  four characters (`sk_test_...a1b2`), so test and live keys can be told apart. A
   value is sent once, when the user saves it. The field the user types into is hidden, with a
   Show / Hide toggle; the stored value is never shown again.
 - **Env files:** `genesis_writeKeyToEnvFile` accepts only a file named `.env`, `.env.local` or

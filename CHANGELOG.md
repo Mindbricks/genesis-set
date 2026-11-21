@@ -3,6 +3,14 @@
 The package follows semantic versioning. Each release names the mind-set range it needs
 (`dependencies["@mindbricks/mind-set"]` in `package.json`).
 
+## 0.2.1 (pre-release)
+
+- A stored key is shown as its type prefix and last four characters (`sk_mbx_...9f3a`,
+  `sk_test_...a1b2`) in `genesis config show`, `genesis doctor`, the install key step and the
+  key page, so the user can tell which key is set and whether it is a test or a live key. At
+  least eight characters always stay hidden; a shorter value is only shown as "set". The agent
+  tools still answer set or empty only.
+
 ## 0.2.0 (pre-release)
 
 Needs mind-set `^0.2.0`.

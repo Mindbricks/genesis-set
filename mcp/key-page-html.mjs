@@ -112,7 +112,7 @@ const SCRIPT = `
     c.append(head);
     if (k.description) c.append(el('p', 'desc', k.description));
     const meta = [];
-    if (k.tail) meta.push('ends with ' + k.tail);
+    if (k.masked) meta.push('key ' + k.masked);
     if (k.status === 'set' && k.updatedAt) meta.push('saved ' + when(k.updatedAt));
     if (meta.length) c.append(el('p', 'meta', meta.join(' · ')));
     if (k.source) c.append(el('p', 'note', 'The environment variable ' + k.source + ' is set and wins over a value saved here.'));

@@ -12,7 +12,7 @@
 // the last four characters for the page, and `keyValue` is for the code that
 // uses a key (writing a gitignored env file), never for a tool answer.
 
-import { API_KEY_ENV, configPathOf, readConfigFile, writeConfigFile } from './config.mjs';
+import { API_KEY_ENV, configPathOf, maskSecret, readConfigFile, writeConfigFile } from './config.mjs';
 
 export const BUILTIN_KEY = 'genesis-api-key';
 const BUILTIN_LABEL = 'Genesis API key';
@@ -80,13 +80,9 @@ function checkValue(value) {
   return v;
 }
 
-/** The last four characters, for a long value only (a short one would give most of it away). */
-function tailOf(value) {
-  return typeof value === 'string' && value.length >= 12 ? value.slice(-4) : null;
-}
-
-function row(name, entry, { builtin = false, envOverride = false } = {}) {
+function row(name, entry, { builtin = false, envOverride = false, envValue = null } = {}) {
   const value = typeof entry.value === 'string' && entry.value ? entry.value : null;
+  // The key in effect: for the Genesis API key the environment variable wins over the file.
   return {
     name,
     label: entry.label || name,
@@ -94,14 +90,14 @@ function row(name, entry, { builtin = false, envOverride = false } = {}) {
     builtin,
     status: value || envOverride ? 'set' : 'empty',
     ...(envOverride ? { source: API_KEY_ENV } : {}),
-    tail: tailOf(value),
+    masked: maskSecret(envOverride ? envValue : value),
     updatedAt: entry.updatedAt ?? null,
   };
 }
 
 /**
- * Every key, the built-in Genesis API key first. `tail` (the last four
- * characters) is for the page; the tools drop it.
+ * Every key, the built-in Genesis API key first. `masked` (the type prefix and
+ * the last four characters, see maskSecret) is for the page; the tools drop it.
  */
 export function listKeys(env = process.env) {
   const { cfg, keys } = load(env);
@@ -110,7 +106,7 @@ export function listKeys(env = process.env) {
     row(
       BUILTIN_KEY,
       { label: BUILTIN_LABEL, description: BUILTIN_DESCRIPTION, value: cfg.apiKey, updatedAt: cfg.apiKeyUpdatedAt },
-      { builtin: true, envOverride: envKey },
+      { builtin: true, envOverride: envKey, envValue: envKey ? env[API_KEY_ENV] : null },
     ),
   ];
   for (const name of Object.keys(keys).sort()) {

@@ -91,10 +91,10 @@ export function isKeyTool(name) {
   return KEY_TOOL_NAMES.has(name);
 }
 
-/** A row for the agent: the page's row without the value's tail. */
+/** A row for the agent: the page's row without any part of the value. */
 function forAgent(row) {
   if (!row) return row;
-  const { tail: _tail, ...rest } = row;
+  const { masked: _masked, ...rest } = row;
   return rest;
 }
 

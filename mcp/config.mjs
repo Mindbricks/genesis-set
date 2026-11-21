@@ -29,6 +29,29 @@ export function portalKeysUrl(apiBase) {
   return PORTAL_KEYS_URL;
 }
 export const CONFIG_FILE = 'config.json';
+
+/** How many characters of a stored key always stay hidden when it is shown. */
+export const MASK_HIDDEN_MIN = 8;
+/** The longest type prefix a masked key shows. */
+export const MASK_PREFIX_MAX = 12;
+
+/**
+ * A stored key as the user may see it: its type prefix and its last four
+ * characters, for example `sk_test_...a1b2` or `sk_mbx_...9f3a`, so the user can
+ * tell which key is set (test or live, which account) without the key being
+ * shown. The prefix is the leading marker, one or two letter segments that end
+ * in `_` or `-` (at most MASK_PREFIX_MAX characters), else the first four
+ * characters. Answers null when fewer than MASK_HIDDEN_MIN characters would stay
+ * hidden: a short value is only ever "set". Never for an agent's answer.
+ */
+export function maskSecret(value) {
+  if (typeof value !== 'string') return null;
+  const v = value.trim();
+  const marker = v.match(/^[A-Za-z]{1,8}[_-](?:[A-Za-z]{1,8}[_-])?/);
+  const prefix = marker && marker[0].length <= MASK_PREFIX_MAX ? marker[0] : v.slice(0, 4);
+  if (v.length - prefix.length - 4 < MASK_HIDDEN_MIN) return null;
+  return `${prefix}...${v.slice(-4)}`;
+}
 /** The server's default inline-blueprint limit (bytes of the compact JSON text). */
 export const DEFAULT_MAX_BLUEPRINT_BYTES = 10 * 1024 * 1024;
 export const DEFAULT_TIMEOUT_MS = 120_000;

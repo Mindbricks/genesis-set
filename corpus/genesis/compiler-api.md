@@ -59,7 +59,8 @@ Genesis never deploys anything and never runs your services.
      and how to set the key: pass it on as it is.
 3. The API base is `https://api.genesiscompiler.com`. Change it only when the user names
    another one (`GENESIS_API_BASE`, or `genesis config set-base <url>`).
-4. `genesis doctor` says where the key comes from (never its value), the API base and
+4. `genesis doctor` says where the key comes from and which key it is (type prefix and last four
+   characters, never the whole key), the API base and
    whether each agent has the MCP server.
 
 ## 4. The tools
