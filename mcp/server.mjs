@@ -159,4 +159,6 @@ function isMain() {
     return false;
   }
 }
-if (isMain()) serve().then(() => process.exit(0));
+// Exit only once stdout is flushed: on a pipe, process.exit drops what is not
+// written yet, and the last answer before stdin closed would be cut.
+if (isMain()) serve().then(() => process.stdout.write('', () => process.exit(0)));

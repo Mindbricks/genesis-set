@@ -5,7 +5,7 @@
 // pass-through of Genesis errors.
 
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
@@ -419,5 +419,26 @@ describe('errors pass through in the Genesis shape', () => {
     await call(s, 'genesis_getBuilds', {});
     assert.equal(requests[0].url, `${API}/builds`);
     await s.close();
+  });
+});
+
+describe('closing stdin', () => {
+  test('every answer is written out in full before the server exits', () => {
+    // Many requests and then end of input: the server must flush every answer before it exits
+    // (a process.exit on a pipe drops unwritten output; it once cut a tools/list at 8 KiB).
+    const home = makeHome();
+    const requests = [{ jsonrpc: '2.0', id: 0, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {} } }];
+    for (let i = 1; i <= 40; i++) requests.push({ jsonrpc: '2.0', id: i, method: 'tools/list' });
+    const res = spawnSync(process.execPath, [SERVER], {
+      input: requests.map((m) => JSON.stringify(m)).join('\n') + '\n',
+      encoding: 'utf8',
+      env: { HOME: home, USERPROFILE: home, PATH: process.env.PATH },
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    assert.equal(res.status, 0, res.stderr);
+    const answers = res.stdout.trim().split('\n').map((l) => JSON.parse(l));
+    assert.equal(answers.length, 41);
+    assert.ok(res.stdout.length > 256 * 1024, `the answers are large enough to fill a pipe (${res.stdout.length} bytes)`);
+    for (const a of answers.slice(1)) assert.equal(a.result.tools.length, 9);
   });
 });
