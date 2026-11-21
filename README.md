@@ -2,12 +2,12 @@
 
 > **PRE-RELEASE.** The Genesis Compiler API is open at `https://api.genesiscompiler.com`.
 > Builds are dry runs for now: the code is generated and measured, nothing is pushed yet.
-> This package is not published to npm yet.
 
 Skills that teach a coding agent (Claude Code, Codex) to use the **Genesis compiler** on an
 OpenAPPL blueprint: what the generated services do at run time, the Genesis steps next to the
 blueprint procedures, and the Genesis Compiler API (validate, build, follow a build). A local
-MCP server gives the agent the Compiler API as five `genesis_*` tools.
+MCP server gives the agent the Compiler API as five `genesis_*` tools, plus four tools and a
+local page for the keys the agent needs.
 
 genesis-set sits on [mind-set](https://github.com/Mindbricks/mind-set), the OpenAPPL layer.
 mind-set teaches designing and writing the blueprint; genesis-set adds what is specific to

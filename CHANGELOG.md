@@ -3,9 +3,9 @@
 The package follows semantic versioning. Each release names the mind-set range it needs
 (`dependencies["@mindbricks/mind-set"]` in `package.json`).
 
-## 0.1.0 (pre-release, not published)
+## 0.1.0 (pre-release)
 
-First version, built ahead of the Genesis Compiler API opening.
+First version, published with the Genesis Compiler API open for dry-run builds.
 
 - Published as `@mindbricks/genesis-set` (the command is `genesis-set`), like
   `@mindbricks/mind-set`.
