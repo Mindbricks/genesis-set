@@ -3,6 +3,14 @@
 The package follows semantic versioning. Each release names the mind-set range it needs
 (`dependencies["@mindbricks/mind-set"]` in `package.json`).
 
+## 0.3.0 (pre-release)
+
+- `genesis init [<folder>] [--dry-run]` prepares a project folder so the agent works the
+  OpenAPPL + Genesis way from its first session. It writes a marked block into `CLAUDE.md` and
+  `AGENTS.md` (the order of work with the skill for each step, and the key rules) and creates
+  `design/` and the env and secrets lines of `.gitignore`; it prints the API key status and a
+  starter prompt. Content outside the block is kept, and a second run changes nothing.
+
 ## 0.2.1 (pre-release)
 
 - A stored key is shown as its type prefix and last four characters (`sk_mbx_...9f3a`,

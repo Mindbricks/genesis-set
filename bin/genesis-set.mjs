@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { configCommand, offerApiKey } from '../lib/config-cli.mjs';
+import { initProject } from '../lib/init.mjs';
 import { chooseAgents, doctor, install, resolveContext, uninstall, update } from '../lib/install.mjs';
 
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -18,6 +19,7 @@ const HELP = `genesis ${pkg.version}: Genesis compiler skills for coding agents 
 
 Usage:
   genesis install [--claude] [--codex] [--force] [--no-mcp] [--no-key] [--dry-run]
+  genesis init [<folder>] [--dry-run]
   genesis update [--claude] [--codex] [--force] [--no-mcp] [--dry-run]
   genesis uninstall [--dry-run]
   genesis doctor
@@ -40,6 +42,13 @@ install    makes sure mind-set ${pkg.dependencies?.['@mindbricks/mind-set'] ?? '
            API key: with none set, it names the portal page that creates one
            and, on a terminal, reads it hidden (Enter skips; --no-key skips
            the step). Nothing is written into a project folder.
+init       prepares a project folder (default: the current one) so the agent
+           works the OpenAPPL + Genesis way from its first session: a marked
+           block in CLAUDE.md (Claude Code) and AGENTS.md (Codex) with the
+           order of work and the key rules (your own content in those files
+           is kept; a second run only refreshes the block), design/ and the
+           env and secrets lines of .gitignore. It prints the API key status
+           and a starter prompt. The one command that writes into a project.
 update     install for this version (and every agent installed before), then
            delete older genesis-set corpus versions.
 uninstall  removes only what install recorded in ~/.genesis-set/installed.json;
@@ -81,6 +90,7 @@ function parseArgs(argv) {
 
 const KNOWN_FLAGS = {
   install: ['claude', 'codex', 'force', 'noMcp', 'noKey', 'dryRun'],
+  init: ['dryRun'],
   update: ['claude', 'codex', 'force', 'noMcp', 'dryRun'],
   uninstall: ['dryRun'],
   doctor: [],
@@ -108,6 +118,13 @@ async function main(argv) {
   if (unknown.length) {
     err(`error: unknown option for ${command}: ${unknown.map((f) => `--${f}`).join(', ')}`);
     return 2;
+  }
+  if (command === 'init') {
+    if (positional.length > 2) {
+      err('error: init takes one folder at most');
+      return 2;
+    }
+    return initProject({ dir: positional[1] ?? process.cwd(), env: process.env, out, err, dryRun: flags.dryRun === true });
   }
   if (command === 'keys') {
     const { ensureKeyPage, keyPageClosed, closeKeyPage } = await import('../mcp/key-page.mjs');

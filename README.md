@@ -24,10 +24,40 @@ as an alias). It depends on
 `@mindbricks/mind-set`, so the global install brings mind-set's package too, and
 `genesis install` runs `mindset install` when mind-set is not installed yet.
 
+## Starting a project
+
+The skills start when a request talks about OpenAPPL or Genesis. A plain "build me a booking
+app" can make an agent hand-write a backend instead, so prepare the project folder once:
+
+```bash
+mkdir my-app && cd my-app
+genesis init
+```
+
+`genesis init` writes a marked block into `CLAUDE.md` (Claude Code) and `AGENTS.md` (Codex),
+which the agents read at the start of every session:
+- the backend is an OpenAPPL blueprint compiled by Genesis, never hand-written;
+- the order of work with the skill for each step;
+- the key rules.
+
+It also creates `design/` and the env and secrets lines of `.gitignore`, then prints the API
+key status and a starter prompt.
+- Your own content in `CLAUDE.md` and `AGENTS.md` is kept.
+- A second run only refreshes the block.
+- `--dry-run` shows what it would write.
+
+Then open the agent in the folder and start, for example:
+
+```text
+Let us design a new application with OpenAPPL and compile it with Genesis: a table booking
+system for cafes, with owner, waiter and guest roles. Start with the requirements interview.
+```
+
 ## Commands
 
 | Command | What it does |
 |---|---|
+| `genesis init [<folder>] [--dry-run]` | Prepares a project folder (default: the current one) for the agent: the OpenAPPL + Genesis block in `CLAUDE.md` and `AGENTS.md`, `design/`, the env lines of `.gitignore`, then the key status and a starter prompt (see "Starting a project"). |
 | `genesis install [--claude] [--codex] [--force] [--no-mcp] [--no-key] [--dry-run]` | Makes sure a compatible mind-set is installed (it comes with this package and is installed by its own CLI), copies the corpus to `~/.genesis-set/<version>/` (linked as `~/.genesis-set/current`), writes each `genesis-*` skill to Claude Code (`~/.claude/skills/`) and Codex (`~/.agents/skills/`), registers the MCP server (below), and ends with the API key step (below). |
 | `genesis update [...]` | Installs this version for every agent installed before (and every detected one), then deletes older corpus versions. |
 | `genesis uninstall [--dry-run]` | Removes only what `install` recorded in `~/.genesis-set/installed.json`, including the MCP registrations. mind-set and your API key file stay. |
@@ -112,7 +142,8 @@ without a Genesis API key:
 ### Projects and credentials
 
 - The project's identity is the blueprint's (`projectSettings.basicSettings.name`); there is
-  no binding file, and genesis-set writes nothing into a project folder.
+  no binding file. Only `genesis init`, run on a project folder, writes there (the agent
+  instructions, `design/`, `.gitignore`); nothing else genesis-set does touches a project.
 - **Getting the key:** the user signs in to the Genesis portal and creates one on its API keys
   page, `https://portal.genesiscompiler.com/keys` (the stage API `sapi.genesiscompiler.com`
   has `https://stage.genesiscompiler.com/keys`). The key is shown once.
