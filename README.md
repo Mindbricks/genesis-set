@@ -63,7 +63,20 @@ live from the folder as the agent writes, and shows:
 - **Documents:** every design document, rendered;
 - **Interview:** its status, the coverage ledger and the open questions;
 - **Blueprint:** its services, data objects and APIs, and the `mindset validate` result;
+- **Mail:** what the generated services could not deliver: every mail and SMS sent to the
+  board's mail sink, with its text and the codes in it (see below);
 - **Keys:** this project's keys and your global ones; set, replace, clear, delete and add.
+
+The design documents are strongly recommended for the quality of the blueprint (mind-set's
+spec-driven method). They are not part of the OpenAPPL standard, which requires only the
+blueprint. A project whose blueprint was written directly, because the user asked to skip the
+design, shows the design as skipped and follows the blueprint.
+
+**The mail sink.** A generated service with no complete email provider sends its mail
+(verification codes, password resets, notifications), and an SMS with no SMS provider, to a
+mail sink. While the board runs it listens on `127.0.0.1:10465` (`GENESIS_MAILSINK_PORT` moves
+it). Start the services with `MAILSINK_HOST=127.0.0.1 MAILSINK_PORT=10465`, and the board's Mail
+tab lists every message (the newest 200, kept under the project in your home folder).
 
 The board runs on `http://127.0.0.1:4747/` (the next free port if that one is taken;
 `GENESIS_BOARD_PORT` moves it) until it is idle for an hour or you press Ctrl+C.

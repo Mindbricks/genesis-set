@@ -112,9 +112,25 @@ docker compose up --build
   3. Check `genesis_listKeys` until the key is set.
   4. `genesis_writeKeyToEnvFile` puts it into the gitignored env file (`.env`,
      `.providers.secrets.env` or another `*.secrets.env`) without the value passing through you.
+- The stack runs a `mail-sink` service (Mailpit): the mail the services cannot deliver, and every
+  SMS with no SMS provider (sent to the sink as a mail), lands there with nothing to configure.
+  Read it at `http://localhost:8025`.
 - Compose project name is the codename. Use `docker compose ps` and `docker compose logs -f <service>`
   with the compose service names from `docker-compose.yml`.
 - Stop with `docker compose down` (volumes kept); `down -v` wipes the data, which is your decision.
+
+### Mail and SMS while you run locally
+
+A service with no complete email provider sends its mail (verification codes, password resets,
+notifications), and an SMS with no SMS provider, to the mail sink at `MAILSINK_HOST` /
+`MAILSINK_PORT` (default `mail-sink:465`). Nothing listens there on your machine, so start one:
+
+- `genesis board` in the project folder runs a sink on `127.0.0.1:10465` while the board is open,
+  and the board's **Mail** tab lists every message with its text and the codes in it.
+- Start the services with `MAILSINK_HOST=127.0.0.1 MAILSINK_PORT=10465`.
+
+Never put a real email provider's key into a local env file just to read a code: the sink is
+for that. See [pitfalls.md](pitfalls.md) section 3.
 
 ### 4b. One service as a native process (fastest loop)
 

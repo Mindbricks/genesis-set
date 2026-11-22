@@ -82,6 +82,10 @@ button:disabled, input:disabled { opacity: .55; cursor: default; }
 .links button { background: none; border: none; padding: 0; color: var(--muted); font-weight: 500; text-decoration: underline; }
 .links button.danger { color: var(--bad); }
 .note { font-size: 13px; color: var(--warn); margin: 6px 0 0; }
+.mailtext { white-space: pre-wrap; overflow-wrap: anywhere; font: 13.5px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--soft); padding: 12px; border-radius: 8px; margin: 10px 0 0; }
+.codes { display: flex; gap: 6px; flex-wrap: wrap; }
+.code { font: 600 14px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--ok-bg); color: var(--ok); border-radius: 6px; padding: 2px 8px; }
+.envline { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--soft); padding: 6px 10px; border-radius: 6px; display: inline-block; margin-top: 6px; overflow-wrap: anywhere; }
 #flash { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); display: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; z-index: 5; }
 #flash.ok { display: block; color: var(--ok); background: var(--ok-bg); }
 #flash.err { display: block; color: var(--bad); background: var(--bad-bg); }
@@ -92,7 +96,7 @@ const SCRIPT = `
 (() => {
   const main = document.getElementById('main');
   const flash = document.getElementById('flash');
-  const TABS = ['overview', 'documents', 'interview', 'blueprint', 'keys'];
+  const TABS = ['overview', 'documents', 'interview', 'blueprint', 'mail', 'keys'];
   let state = null, shown = '', docCache = new Map();
 
   function el(tag, cls, text) {
@@ -139,6 +143,12 @@ const SCRIPT = `
     const f = state.flow;
     const card = el('section', 'card');
     card.append(el('h2', '', 'Design flow'));
+    card.append(el('div', 'small muted', 'The design documents are strongly recommended for the quality of the blueprint (the spec-driven method of mind-set). They are not part of the OpenAPPL standard, which requires only the blueprint.'));
+    if (state.designSkipped) {
+      card.append(el('p', 'note', 'No design documents: the blueprint was written directly, so its requirements were never settled in writing. Follow it on the Blueprint tab.'));
+      frag.append(card);
+      return frag;
+    }
     if (!f.available) { card.append(el('p', 'muted', 'The design pipeline is not installed. Run "genesis install".')); frag.append(card); return frag; }
     if (!f.checksAvailable) card.append(el('p', 'note', 'design-check is unavailable here (mind-set package not found); documents show as written, not checked.'));
     const stages = [];
@@ -221,6 +231,57 @@ const SCRIPT = `
     return card;
   }
 
+  /** A message's title: its subject, marked SMS unless the subject already says so. */
+  function smsTitle(x) {
+    const subject = x.subject || '(no subject)';
+    return x.kind === 'sms' && !/^SMS\b/.test(subject) ? 'SMS · ' + subject : subject;
+  }
+
+  async function mail(arg) {
+    const m = state.mail || { sink: null, messages: [], count: 0 };
+    const frag = document.createDocumentFragment();
+    const head = el('section', 'card');
+    head.append(el('h2', '', 'Mail sink'));
+    if (m.sink) {
+      head.append(el('div', 'small muted', 'Mail and SMS your services cannot deliver (no email or SMS provider set) are captured here while the board runs. Start the services with:'));
+      head.append(el('div', 'envline', 'MAILSINK_HOST=' + m.sink.host + ' MAILSINK_PORT=' + m.sink.port));
+    } else {
+      head.append(el('p', 'note', 'The mail sink is not running in this board (its port was taken). Mail already captured still shows below.'));
+    }
+    if (state.canWrite && m.count) {
+      const clear = el('button', '', 'Clear mailbox'); clear.type = 'button';
+      clear.addEventListener('click', async () => { if (!confirm('Delete every captured message?')) return; try { await api('DELETE', '/api/mail'); say('Mailbox cleared.', 'ok'); await load(true); } catch (e) { say(e.message, 'err'); } });
+      const r = el('div', 'fields'); r.append(clear); head.append(r);
+    }
+    frag.append(head);
+    if (!m.messages.length) { const c = el('section', 'card'); c.append(el('p', 'muted', 'No message yet.')); frag.append(c); return frag; }
+    const wrap = el('div', 'split');
+    const list = el('section', 'card list');
+    const pick = m.messages.some((x) => x.id === arg) ? arg : m.messages[0].id;
+    for (const x of m.messages) {
+      const r = el('div', 'row link' + (x.id === pick ? ' on' : ''));
+      const t = el('div', 'grow');
+      t.append(el('div', '', smsTitle(x)), el('div', 'small muted', (x.to || []).join(', ') + ' · ' + when(x.receivedAt)));
+      r.append(t);
+      r.addEventListener('click', () => { location.hash = '#mail/' + encodeURIComponent(x.id); });
+      list.append(r);
+    }
+    const view = el('section', 'card');
+    view.append(el('div', '', 'Loading...'));
+    wrap.append(list, view);
+    frag.append(wrap);
+    try {
+      const { message: msg } = await api('GET', '/api/mail/' + encodeURIComponent(pick));
+      view.replaceChildren();
+      view.append(el('h2', '', smsTitle(msg)));
+      view.append(el('div', 'small muted', 'From ' + (msg.from || '-') + ' · to ' + (msg.to || []).join(', ') + ' · ' + when(msg.receivedAt)));
+      if (msg.codes && msg.codes.length) { const c = el('div', 'codes'); c.append(el('span', 'small muted', 'Codes:')); for (const code of msg.codes) c.append(el('span', 'code', code)); view.append(c); }
+      view.append(el('div', 'mailtext', msg.text || '(no text body)'));
+      if (msg.hasHtml) view.append(el('div', 'small muted', 'This message also has an HTML part; it is shown here as text.'));
+    } catch (e) { view.replaceChildren(el('p', 'note', e.message)); }
+    return frag;
+  }
+
   function keyCard(k) {
     const c = el('div', 'kcard');
     const head = el('div', 'khead');
@@ -292,7 +353,7 @@ const SCRIPT = `
     if (sig === shown && !force) return;
     if (!force && tab === 'keys' && typing()) return;
     shown = sig;
-    const content = tab === 'overview' ? overview() : tab === 'documents' ? await documents(arg) : tab === 'interview' ? interview() : tab === 'blueprint' ? blueprint() : keys();
+    const content = tab === 'overview' ? overview() : tab === 'documents' ? await documents(arg) : tab === 'interview' ? interview() : tab === 'blueprint' ? blueprint() : tab === 'mail' ? await mail(arg) : keys();
     main.replaceChildren(content);
   }
 
@@ -320,7 +381,7 @@ export function renderBoardPage({ nonce, projectName }) {
     `<div class="title"><h1>${esc(projectName)}</h1><span class="sub">Genesis project board</span></div>` +
     '<nav><a href="#overview" data-tab="overview">Overview</a><a href="#documents" data-tab="documents">Documents</a>' +
     '<a href="#interview" data-tab="interview">Interview</a><a href="#blueprint" data-tab="blueprint">Blueprint</a>' +
-    '<a href="#keys" data-tab="keys">Keys</a></nav></div></header>' +
+    '<a href="#mail" data-tab="mail">Mail</a><a href="#keys" data-tab="keys">Keys</a></nav></div></header>' +
     '<main id="main"></main>' +
     '<div class="bar"><footer>Local board on 127.0.0.1, read from the project folder as the agent writes. Open it any time with <code>genesis board</code> in the project folder.</footer></div>' +
     '<div id="flash" role="status" aria-live="polite"></div>' +

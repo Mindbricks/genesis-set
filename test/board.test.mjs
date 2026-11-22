@@ -101,8 +101,9 @@ describe('the board data', () => {
     assert.equal(byName['frontend-spec'].conditional, true);
     assert.equal(byName['service-spec-<service>'].placeholder, true);
     assert.ok(state.flow.docs.every((d) => !d.written));
-    assert.match(state.next, /Start the requirements interview/);
+    assert.match(state.next, /design the application\. The design documents are strongly recommended for the quality of the blueprint/);
     assert.equal(state.blueprint, null);
+    assert.equal(state.designSkipped, false);
   });
 
   test('a project mid-design: written documents with their checks, one spec per roster service, the interview', async () => {
@@ -145,6 +146,16 @@ describe('the board data', () => {
     assert.match(state.validation.first[0], /serviceSettings is required/);
     const broken = await boardState({ env, project: project({ 'blueprint.json': '{ not json' }) });
     assert.match(broken.blueprint.error, /not valid JSON/);
+  });
+
+  test('a blueprint written without design documents: the design counts as skipped, the next step follows the blueprint', async () => {
+    const env = envFor(fakeMindSet());
+    const bp = { services: [{ serviceSettings: { serviceBasics: { name: 'orders' } } }] };
+    const state = await boardState({ env, project: project({ 'blueprint.json': JSON.stringify(bp) }) });
+    assert.equal(state.designSkipped, true);
+    assert.match(state.next, /Compile the blueprint with Genesis/);
+    const invalid = await boardState({ env, project: project({ 'blueprint.json': JSON.stringify({ services: [{}] }) }) });
+    assert.match(invalid.next, /Fix the 1 validation error/);
   });
 
   test('a document is read only by its own name inside design/', () => {
@@ -201,6 +212,9 @@ describe('the board server', () => {
     assert.equal(page.status, 200);
     assert.match(page.headers['content-security-policy'], /script-src 'nonce-/);
     assert.match(page.text, /cafe · Genesis board/);
+    // The inline script must parse: a broken quote in it leaves a blank board.
+    const script = page.text.split(/<script nonce="[^"]+">/)[1].split('</script>')[0];
+    assert.doesNotThrow(() => new Function(script));
     const state = (await req(port, { pathName: '/api/state' })).json();
     assert.equal(state.canWrite, false);
     assert.equal(state.project.name, 'cafe');

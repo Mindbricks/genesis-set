@@ -3,6 +3,21 @@
 The package follows semantic versioning. Each release names the mind-set range it needs
 (`dependencies["@mindbricks/mind-set"]` in `package.json`).
 
+## 0.5.0 (pre-release)
+
+- **The mail sink:** the board runs a mail sink on `127.0.0.1:10465` and has a **Mail** tab.
+  Mail and SMS that the generated services cannot deliver (no email or SMS provider) land
+  there with their text, recipients and the codes in them. Run the services with
+  `MAILSINK_HOST` / `MAILSINK_PORT`; `genesis board` prints them, and the agent's board tool
+  answers them.
+- **The design flow is a strong recommendation, not part of the standard:** it is mind-set's
+  spec-driven method for the quality of the blueprint; the OpenAPPL standard requires only the
+  blueprint.
+  - The `genesis init` instructions start with the design. When the user explicitly asks to
+    skip it, the agent names the quality risk once and writes the blueprint directly.
+  - The board shows a blueprint without design documents as "design skipped" and follows the
+    blueprint.
+
 ## 0.4.0 (pre-release)
 
 - **`genesis board`:** a local board for a genesis project. It is read live from the folder and

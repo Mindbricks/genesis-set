@@ -26,6 +26,7 @@ import { boardState, designDoc } from './board-data.mjs';
 import { renderBoardPage } from './board-html.mjs';
 import { renderMarkdown } from './board-md.mjs';
 import { KeyStoreError, SCOPES, clearKeyValue, deleteKey, requestKey, setKeyValue } from './key-store.mjs';
+import { clearMail, closeMailSink, ensureMailSink, listMail, readMail } from './mail-sink.mjs';
 
 export const BOARD_PORT = 4747;
 const PORT_TRIES = 20;
@@ -136,11 +137,24 @@ async function handle(board, req, res) {
   }
 
   if (req.method === 'GET' && url.pathname === '/api/whoami') {
-    return sendJson(res, 200, { app: 'genesis-board', projectId: board.project.id, dataDir: dataDirOf(board.env) });
+    return sendJson(res, 200, { app: 'genesis-board', projectId: board.project.id, dataDir: dataDirOf(board.env), mailSink: board.mailSink ?? null });
   }
   if (req.method === 'GET' && url.pathname === '/api/state') {
     const state = await boardState({ env: board.env, project: board.project });
-    return sendJson(res, 200, { ...state, canWrite });
+    const mail = listMail(board.env, board.project.id);
+    return sendJson(res, 200, { ...state, mail: { sink: board.mailSink, count: mail.length, messages: mail.slice(0, 100) }, canWrite });
+  }
+  if (req.method === 'GET' && url.pathname.startsWith('/api/mail/')) {
+    const m = readMail(board.env, board.project.id, decodeURIComponent(url.pathname.slice('/api/mail/'.length)));
+    if (!m) return sendError(res, 404, 'GENESIS_BOARD_NO_MAIL', 'no such message');
+    return sendJson(res, 200, { message: m });
+  }
+  if (req.method === 'DELETE' && url.pathname === '/api/mail') {
+    if (!canWrite) return sendError(res, 403, 'GENESIS_BOARD_READ_ONLY', 'this board is read-only here; open it with "genesis board" to clear the mail');
+    const origin = String(req.headers.origin ?? '').toLowerCase();
+    if (!origin || !hosts.has(origin.replace(/^http:\/\//, ''))) return sendError(res, 403, 'GENESIS_BOARD_ORIGIN', 'writes are accepted only from the board itself');
+    clearMail(board.env, board.project.id);
+    return sendJson(res, 200, { cleared: true });
   }
   if (req.method === 'GET' && url.pathname === '/api/doc') {
     const name = url.searchParams.get('name') ?? '';
@@ -253,7 +267,7 @@ export async function ensureBoard({ env = process.env, project, idleMs = BOARD_I
   if (!project) throw new Error('the board needs a genesis project ("genesis init" makes one)');
   if (current && current.server.listening && current.project.id === project.id && current.env === env) {
     touch(current);
-    return { ...linksOf(current.port, current.token), reused: true, idleMinutes: Math.round(current.idleMs / 60000) };
+    return { ...linksOf(current.port, current.token), reused: true, idleMinutes: Math.round(current.idleMs / 60000), mailSink: current.mailSink ?? null };
   }
   if (current) await closeBoard();
   const board = { token: randomBytes(24).toString('base64url'), env, project, idleMs, port: 0, timer: null, server: null };
@@ -279,7 +293,7 @@ export async function ensureBoard({ env = process.env, project, idleMs = BOARD_I
       } catch {
         // the running board did not leave its token: the link is read-only
       }
-      return { ...linksOf(port, token), reused: true, idleMinutes: null };
+      return { ...linksOf(port, token), reused: true, idleMinutes: null, mailSink: other.mailSink ?? null };
     }
   }
   if (!board.port) throw new Error(`no free port for the board between ${basePort} and ${basePort + PORT_TRIES - 1}`);
@@ -291,9 +305,11 @@ export async function ensureBoard({ env = process.env, project, idleMs = BOARD_I
   } catch {
     board.tokenFile = null; // the board still works; another process just cannot hand out its write link
   }
+  // The project's mail sink lives as long as its board (#9389).
+  board.mailSink = await ensureMailSink({ env, project }).catch(() => null);
   current = board;
   touch(board);
-  return { ...linksOf(board.port, board.token), reused: false, idleMinutes: Math.round(idleMs / 60000) };
+  return { ...linksOf(board.port, board.token), reused: false, idleMinutes: Math.round(idleMs / 60000), mailSink: board.mailSink };
 }
 
 /** Closes this process's board; its links stop working and its token file goes. */
@@ -303,6 +319,7 @@ export async function closeBoard() {
   if (!board) return;
   clearTimeout(board.timer);
   if (board.tokenFile) fs.rmSync(board.tokenFile, { force: true });
+  await closeMailSink();
   await new Promise((resolve) => {
     board.server.close(() => resolve());
     board.server.closeAllConnections?.();

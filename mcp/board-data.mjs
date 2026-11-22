@@ -212,21 +212,30 @@ async function flow(env, root, pipeline, files) {
   return { available: true, checksAvailable: Boolean(dc), docs, other };
 }
 
+function blueprintStep(blueprint, v) {
+  if (!blueprint) return null;
+  if (blueprint.error) return `Fix blueprint.json: ${blueprint.error}.`;
+  if (v?.available && v.errors > 0) return `Fix the ${v.errors} validation error(s) of the blueprint.`;
+  return 'Compile the blueprint with Genesis, one service at a time.';
+}
+
 function nextStep(state) {
   const { flow: f, interview, blueprint, validation: v } = state;
+  // The design documents are mind-set's recommended method, not part of the OpenAPPL standard:
+  // a blueprint written without them is followed on its own (#9390).
+  if (state.designSkipped) return blueprintStep(blueprint, v);
   if (!f.available) return 'Install mind-set ("genesis install") so the board can show the design flow.';
   const byName = new Map(f.docs.map((d) => [d.docName, d]));
   const ir = byName.get('interview-record');
-  if (!ir?.written) return 'Start the requirements interview: ask the agent to design the application.';
+  if (!ir?.written) {
+    return 'Start: ask the agent to design the application. The design documents are strongly recommended for the quality of the blueprint.';
+  }
   if (interview?.status && !/closed/.test(interview.status)) return 'Finish the requirements interview (the record is not closed yet).';
   const failing = f.docs.find((d) => d.written && d.check && !d.check.ok);
   if (failing) return `Fix ${failing.docName}: its design-check has findings.`;
   const missing = f.docs.find((d) => !d.written && !d.conditional && d.class !== 'test');
   if (missing) return `Next document: ${missing.placeholder ? 'the service specs (one per service)' : missing.docName}.`;
-  if (!blueprint) return 'Write the blueprint (blueprint.json) from the design documents.';
-  if (blueprint.error) return `Fix blueprint.json: ${blueprint.error}.`;
-  if (v?.available && v.errors > 0) return `Fix the ${v.errors} validation error(s) of the blueprint.`;
-  return 'Compile the blueprint with Genesis, one service at a time.';
+  return blueprintStep(blueprint, v) ?? 'Write the blueprint (blueprint.json) from the design documents.';
 }
 
 /** The whole board state of a project (or, without one, only the global keys). */
@@ -252,6 +261,8 @@ export async function boardState({ env = process.env, project }) {
     interview: interviewSummary(files.has('interview-record') ? readText(files.get('interview-record').file) : null),
     blueprint: bp ? { file: bp.file, name: bp.name ?? null, services: bp.services ?? [], error: bp.error ?? null } : null,
     validation: await validation(env, bp),
+    // A blueprint with no design document: the design was skipped, which the standard allows.
+    designSkipped: Boolean(bp) && files.size === 0,
     keys,
   };
   state.next = nextStep(state);

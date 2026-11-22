@@ -205,7 +205,16 @@ async function boardLink(settings, project, { open, tab } = {}) {
   const hash = tab ? `#${tab}` : '';
   const url = `${b.url}${hash}`;
   const opened = open === true ? openInBrowser(url) : false;
-  return { url, readUrl: `${b.readUrl}${hash}`, port: b.port, opened, reopen: 'genesis board (in the project folder)' };
+  return {
+    url,
+    readUrl: `${b.readUrl}${hash}`,
+    port: b.port,
+    opened,
+    reopen: 'genesis board (in the project folder)',
+    ...(b.mailSink
+      ? { mailSink: { ...b.mailSink, env: { MAILSINK_HOST: b.mailSink.host, MAILSINK_PORT: String(b.mailSink.port) }, note: 'Run the generated services with these env values: every mail and SMS without a real provider lands on the board\'s Mail tab.' } }
+      : {}),
+  };
 }
 
 const HANDLERS = {

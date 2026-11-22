@@ -98,6 +98,10 @@ Notes:
   both. Use URL-safe passwords (the MongoDB password goes into a connection URL). Put a PEM into
   `.env` in double quotes.
 - The infrastructure is reachable only inside the compose network.
+- **Mail and SMS:** the stack runs a `mail-sink` service (Mailpit). A mail the services cannot
+  deliver (no complete email provider) and an SMS with no SMS provider, which travels to the sink
+  as a mail, land there; read them at `http://localhost:8025`. The services reach it at their
+  default `mail-sink:465`, so nothing is configured. Declare a real provider to send for real.
 
 ## 4. Railway
 

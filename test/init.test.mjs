@@ -33,6 +33,10 @@ describe('genesis init', () => {
       }
       assert.match(text, /never ask for a key or a password in the chat/);
       assert.match(text, /Never hand-write backend code/);
+      assert.match(text, /strongly recommended, for the quality of the blueprint/);
+      assert.match(text, /not a rule of the OpenAPPL standard, which\s+requires only the blueprint/);
+      assert.match(text, /Only if the user explicitly asks to skip the design documents/);
+      assert.match(text, /mail sink captures the mail and SMS/);
     }
     assert.ok(fs.existsSync(path.join(dir, 'design', 'README.md')));
     const identity = JSON.parse(read(path.join(dir, '.genesis', 'project.json')));
