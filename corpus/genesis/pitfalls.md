@@ -62,22 +62,23 @@ send fails with an SMTP connect error to `mail-sink`.
    `mail-sink` port `465`; `MAILSINK_HOST` and `MAILSINK_PORT` point the service at another
    one, `MAILSINK_REJECT_UNAUTHORIZED` is for a sink with a certificate the service does not
    trust.
-4. The generated `deploy/docker-compose/` stack runs a `mail-sink` service (Mailpit) that the
-   services reach at that default address; read the mail at `http://localhost:8025`. A stack
+4. The generated `deploy/docker-compose/` stack runs a `mail-sink` service (Mailpit) and sets
+   `MAILSINK_HOST=mail-sink` / `MAILSINK_PORT=465` for its services, the way it sets
+   `DB_HOST=postgres`; read the mail at `http://localhost:8025`. The dev slot (`.dev.env`) of a
+   current build names the local sink `localhost:10465` for a service run natively. A stack
    from an older build lists no mail-sink service: there the send fails after retries, one
    `failed` delivery row per message. It looks like an outage; it is the same missing channel
    seen from the other side. Rebuild with the `docker-compose` target, or start a sink yourself.
 
 **Do:**
 
-- For development, run `genesis board` in the project folder: it starts a mail sink on
-  `127.0.0.1:10465` and prints it. Start the services with `MAILSINK_HOST=127.0.0.1
-  MAILSINK_PORT=10465`, and every mail and SMS they cannot deliver shows on the board's Mail tab
-  (verification codes are picked out). Any other SMTP capture server your stack can reach works
-  the same way.
-  - **A docker-compose stack:** a container cannot reach the host's 127.0.0.1 on Linux. Use the
-    stack's own sink when it has one, or point `MAILSINK_HOST` at `host.docker.internal` where
-    the runtime maps it (Docker Desktop, OrbStack).
+- For development, the mail sink is infrastructure like the database: never edit the generated
+  env to reach one.
+  - **The docker-compose stack:** it runs its own (`docker compose up`).
+  - **A service run natively:** its `.dev.env` already names `localhost:10465`. Start the same
+    Mailpit there (run-locally.md, "Mail and SMS while you run locally").
+
+  The project board's Mail tab (`genesis board`) reads the sink, with the codes picked out.
 - Judge mail by the channel, never by the send status: success against the sink means
   "stored in the sink", not "reached a recipient".
 - For stage and production, declare a real email provider in the blueprint and give it its

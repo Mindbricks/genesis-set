@@ -47,20 +47,22 @@ h2 { font-size: 16px; margin: 0 0 10px; }
 .chip.bad { color: var(--bad); background: var(--bad-bg); }
 .chip.idle { color: var(--muted); background: var(--soft); }
 .grow { flex: 1 1 auto; }
-.split { display: grid; grid-template-columns: 260px 1fr; gap: 14px; align-items: start; }
+.split { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 14px; align-items: start; }
+.split > * { min-width: 0; }
 @media (max-width: 760px) { .split { grid-template-columns: 1fr; } }
-.list .row { padding: 6px 10px; }
+.list .row { padding: 6px 10px; overflow-wrap: anywhere; }
 .list .row.on { background: var(--soft); font-weight: 600; }
 .md h2, .md h3, .md h4 { margin: 18px 0 8px; } .md h2 { font-size: 18px; } .md h3 { font-size: 16px; } .md h4, .md h5, .md h6 { font-size: 14px; }
 .md p { margin: 8px 0; } .md ul, .md ol { padding-left: 22px; } .md li.d1 { margin-left: 18px; } .md li.d2 { margin-left: 36px; } .md li.d3, .md li.d4 { margin-left: 54px; }
-.md pre { background: var(--soft); padding: 10px 12px; border-radius: 8px; overflow-x: auto; font-size: 13px; }
+.md pre { background: var(--soft); padding: 10px 12px; border-radius: 8px; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.md, .md p, .md li, .md td, .md th, .md blockquote, .md h2, .md h3, .md h4 { overflow-wrap: anywhere; }
 .md code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--soft); padding: 1px 4px; border-radius: 4px; }
 .md pre code { background: none; padding: 0; }
 .md blockquote { margin: 8px 0; padding: 4px 12px; border-left: 3px solid var(--line); color: var(--muted); }
 .md a { color: var(--accent); }
 .table { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; font-size: 14px; }
-th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
 th { color: var(--muted); font-weight: 600; }
 .kgroup h2 { margin-top: 6px; }
 .kcard { border-top: 1px solid var(--line); padding: 12px 0; }
@@ -238,19 +240,25 @@ const SCRIPT = `
   }
 
   async function mail(arg) {
-    const m = state.mail || { sink: null, messages: [], count: 0 };
+    const m = state.mail || { available: false, url: 'http://127.0.0.1:8025' };
     const frag = document.createDocumentFragment();
     const head = el('section', 'card');
     head.append(el('h2', '', 'Mail sink'));
-    if (m.sink) {
-      head.append(el('div', 'small muted', 'Mail and SMS your services cannot deliver (no email or SMS provider set) are captured here while the board runs. Start the services with:'));
-      head.append(el('div', 'envline', 'MAILSINK_HOST=' + m.sink.host + ' MAILSINK_PORT=' + m.sink.port));
-    } else {
-      head.append(el('p', 'note', 'The mail sink is not running in this board (its port was taken). Mail already captured still shows below.'));
+    if (!m.available) {
+      head.append(el('p', 'note', 'No mail sink answers at ' + m.url + '. The mail and SMS your services cannot deliver (no email or SMS provider) go to a mail sink; start one to read them here.'));
+      head.append(el('div', 'small muted', 'In the docker-compose stack of a build: it runs its own mail-sink (Mailpit); "docker compose up" starts it.'));
+      head.append(el('div', 'small muted', 'For services run natively (their .dev.env already names localhost:10465), start the same Mailpit:'));
+      if (m.start) head.append(el('div', 'envline', m.start.command));
+      head.append(el('div', 'small muted', 'Or ask the agent to start the mail sink. GENESIS_MAILPIT_URL points the board at another one.'));
+      frag.append(head);
+      return frag;
     }
-    if (state.canWrite && m.count) {
+    const link = el('a', '', m.url); link.href = m.url; link.target = '_blank'; link.rel = 'noopener noreferrer';
+    const line = el('div', 'small muted', 'Reading the mail sink (Mailpit) at '); line.append(link, document.createTextNode(': every mail and SMS your services could not deliver.'));
+    head.append(line);
+    if (state.canWrite && m.messages.length) {
       const clear = el('button', '', 'Clear mailbox'); clear.type = 'button';
-      clear.addEventListener('click', async () => { if (!confirm('Delete every captured message?')) return; try { await api('DELETE', '/api/mail'); say('Mailbox cleared.', 'ok'); await load(true); } catch (e) { say(e.message, 'err'); } });
+      clear.addEventListener('click', async () => { if (!confirm('Delete every message in the mail sink?')) return; try { await api('DELETE', '/api/mail'); say('Mailbox cleared.', 'ok'); await load(true); } catch (e) { say(e.message, 'err'); } });
       const r = el('div', 'fields'); r.append(clear); head.append(r);
     }
     frag.append(head);
@@ -261,7 +269,7 @@ const SCRIPT = `
     for (const x of m.messages) {
       const r = el('div', 'row link' + (x.id === pick ? ' on' : ''));
       const t = el('div', 'grow');
-      t.append(el('div', '', smsTitle(x)), el('div', 'small muted', (x.to || []).join(', ') + ' · ' + when(x.receivedAt)));
+      t.append(el('div', '', smsTitle(x)), el('div', 'small muted', ((x.to || []).join(', ') || '-') + ' · ' + when(x.receivedAt)));
       r.append(t);
       r.addEventListener('click', () => { location.hash = '#mail/' + encodeURIComponent(x.id); });
       list.append(r);
@@ -274,10 +282,10 @@ const SCRIPT = `
       const { message: msg } = await api('GET', '/api/mail/' + encodeURIComponent(pick));
       view.replaceChildren();
       view.append(el('h2', '', smsTitle(msg)));
-      view.append(el('div', 'small muted', 'From ' + (msg.from || '-') + ' · to ' + (msg.to || []).join(', ') + ' · ' + when(msg.receivedAt)));
+      view.append(el('div', 'small muted', 'From ' + (msg.from || '-') + ' · to ' + ((msg.to || []).join(', ') || '-') + ' · ' + when(msg.receivedAt)));
       if (msg.codes && msg.codes.length) { const c = el('div', 'codes'); c.append(el('span', 'small muted', 'Codes:')); for (const code of msg.codes) c.append(el('span', 'code', code)); view.append(c); }
       view.append(el('div', 'mailtext', msg.text || '(no text body)'));
-      if (msg.hasHtml) view.append(el('div', 'small muted', 'This message also has an HTML part; it is shown here as text.'));
+      if (msg.hasHtml) view.append(el('div', 'small muted', 'This message also has an HTML part; it is shown here as text (the full message is in the mail sink).'));
     } catch (e) { view.replaceChildren(el('p', 'note', e.message)); }
     return frag;
   }

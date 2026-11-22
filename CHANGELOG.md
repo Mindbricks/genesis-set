@@ -3,6 +3,19 @@
 The package follows semantic versioning. Each release names the mind-set range it needs
 (`dependencies["@mindbricks/mind-set"]` in `package.json`).
 
+## 0.6.0 (pre-release)
+
+- **The board reads the mail sink instead of running one.** The mail sink is infrastructure like
+  the database: the generated docker-compose stack runs one (Mailpit), and for a service run
+  natively the agent starts the same Mailpit on the `localhost:10465` its `.dev.env` names
+  (written by the Genesis build, never by hand).
+  - The board's Mail tab reads it through Mailpit's API (`GENESIS_MAILPIT_URL`), lists the mail
+    and SMS with their codes, and clears it with the write cookie.
+  - When no sink answers, the tab says how to start one.
+  - genesis-set no longer opens an SMTP port, and `GENESIS_MAILSINK_PORT` is gone.
+- **The board's document view wraps long lines:** code blocks, tables, long words and the panel
+  column no longer stretch the page sideways.
+
 ## 0.5.0 (pre-release)
 
 - **The mail sink:** the board runs a mail sink on `127.0.0.1:10465` and has a **Mail** tab.

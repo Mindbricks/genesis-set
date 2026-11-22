@@ -31,9 +31,10 @@ tools. Everything stays on the user's machine; nothing is sent to Genesis.
    section 4c: the user installs one (OrbStack or Docker Desktop on macOS, Docker Engine on
    Linux, Docker Desktop with WSL 2 on Windows), or one service runs natively against a
    database only, with what is missing said up front.
-   Mail and SMS: in a genesis project, start the board (`genesis_openBoard`) and run the
-   services with the `MAILSINK_HOST` / `MAILSINK_PORT` it answers; the user reads the mails and
-   codes on the board's Mail tab (run-locally.md, "Mail and SMS while you run locally").
+   Mail and SMS: the mail sink is infrastructure like the database, never an env edit. The
+   docker-compose stack runs it; for a service run natively, start the Mailpit of run-locally.md
+   ("Mail and SMS while you run locally") on the `localhost:10465` its `.dev.env` names. The user
+   reads the mails and codes on the project board's Mail tab.
 3. Wait for `/health` to say ready (`readiness.ready: true`, `boot.state: ready`). A 200 alone is
    only alive.
 4. Run the suite; drive what HTTP cannot reach through the test transport as super-admin; never

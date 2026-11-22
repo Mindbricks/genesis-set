@@ -152,9 +152,6 @@ async function main(argv) {
     const { openInBrowser } = await import('../mcp/key-tools.mjs');
     const board = await ensureBoard({ env: process.env, project });
     out(`Genesis board for "${project.name}": ${board.readUrl}`);
-    if (board.mailSink) {
-      out(`Mail sink: smtp://${board.mailSink.host}:${board.mailSink.port}. Run your services with MAILSINK_HOST=${board.mailSink.host} MAILSINK_PORT=${board.mailSink.port}; their mail and SMS show on the board's Mail tab.`);
-    }
     if (flags.noOpen !== true && !openInBrowser(board.url)) out('Could not open a browser: open the link yourself.');
     if (board.reused && board.idleMinutes === null) {
       out(board.url === board.readUrl ? 'The board already runs in another process (read-only link).' : 'The board already runs in another process; opened it there.');

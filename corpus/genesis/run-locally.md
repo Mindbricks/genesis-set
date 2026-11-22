@@ -112,9 +112,10 @@ docker compose up --build
   3. Check `genesis_listKeys` until the key is set.
   4. `genesis_writeKeyToEnvFile` puts it into the gitignored env file (`.env`,
      `.providers.secrets.env` or another `*.secrets.env`) without the value passing through you.
-- The stack runs a `mail-sink` service (Mailpit): the mail the services cannot deliver, and every
-  SMS with no SMS provider (sent to the sink as a mail), lands there with nothing to configure.
-  Read it at `http://localhost:8025`.
+- The stack runs a `mail-sink` service (Mailpit) and points its services at it
+  (`MAILSINK_HOST=mail-sink`, `MAILSINK_PORT=465`): the mail the services cannot deliver, and
+  every SMS with no SMS provider (sent to the sink as a mail), lands there. Read it at
+  `http://localhost:8025`, or on the project board's Mail tab.
 - Compose project name is the codename. Use `docker compose ps` and `docker compose logs -f <service>`
   with the compose service names from `docker-compose.yml`.
 - Stop with `docker compose down` (volumes kept); `down -v` wipes the data, which is your decision.
@@ -122,12 +123,23 @@ docker compose up --build
 ### Mail and SMS while you run locally
 
 A service with no complete email provider sends its mail (verification codes, password resets,
-notifications), and an SMS with no SMS provider, to the mail sink at `MAILSINK_HOST` /
-`MAILSINK_PORT` (default `mail-sink:465`). Nothing listens there on your machine, so start one:
+notifications), and an SMS with no SMS provider (as a mail), to its mail sink. The sink is
+infrastructure like the database, and its address is a system value of the generated env, never
+something to edit:
 
-- `genesis board` in the project folder runs a sink on `127.0.0.1:10465` while the board is open,
-  and the board's **Mail** tab lists every message with its text and the codes in it.
-- Start the services with `MAILSINK_HOST=127.0.0.1 MAILSINK_PORT=10465`.
+- **The docker-compose stack (4a)** runs its own `mail-sink` and sets `MAILSINK_HOST=mail-sink` /
+  `MAILSINK_PORT=465` for its services.
+- **A service run natively (4b):** its `.dev.env` names `MAILSINK_HOST=localhost` /
+  `MAILSINK_PORT=10465`, like `DB_HOST=localhost`. Start the same Mailpit the stack runs, with
+  its SMTP on that host port:
+
+  ```sh
+  docker run -d --name mail-sink -p 8025:8025 -p 10465:465 -e MP_SMTP_BIND_ADDR=0.0.0.0:465 -e MP_SMTP_AUTH_ACCEPT_ANY=true -e MP_SMTP_AUTH_ALLOW_INSECURE=true axllent/mailpit:v1.33.1
+  ```
+
+Read the mail at `http://localhost:8025`, or on the project board's **Mail** tab
+(`genesis board`), which lists every message with its text and the codes in it; the board
+reads the sink and runs none of its own (`GENESIS_MAILPIT_URL` points it at another one).
 
 Never put a real email provider's key into a local env file just to read a code: the sink is
 for that. See [pitfalls.md](pitfalls.md) section 3.
