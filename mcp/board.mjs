@@ -22,7 +22,7 @@ import http from 'node:http';
 import path from 'node:path';
 
 import { dataDirOf } from './config.mjs';
-import { boardState, designDoc } from './board-data.mjs';
+import { blueprintModule, boardState, designDoc } from './board-data.mjs';
 import { renderBoardPage } from './board-html.mjs';
 import { renderMarkdown } from './board-md.mjs';
 import { KeyStoreError, SCOPES, clearKeyValue, deleteKey, requestKey, setKeyValue } from './key-store.mjs';
@@ -159,6 +159,11 @@ async function handle(board, req, res) {
       return sendError(res, 502, 'GENESIS_BOARD_MAIL_SINK', `the mail sink did not clear: ${e.message}`);
     }
     return sendJson(res, 200, { cleared: true });
+  }
+  if (req.method === 'GET' && url.pathname === '/api/blueprint') {
+    const m = await blueprintModule(board.env, board.project, url.searchParams.get('path') ?? '$');
+    if (!m) return sendError(res, 404, 'GENESIS_BOARD_NO_MODULE', 'no such part of blueprint.json');
+    return sendJson(res, 200, { module: m });
   }
   if (req.method === 'GET' && url.pathname === '/api/doc') {
     const name = url.searchParams.get('name') ?? '';

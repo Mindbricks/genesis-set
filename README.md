@@ -62,7 +62,10 @@ live from the folder as the agent writes, and shows:
   every document written, waiting or "if needed" and its `design-check` result;
 - **Documents:** every design document, rendered;
 - **Interview:** its status, the coverage ledger and the open questions;
-- **Blueprint:** its services, data objects and APIs, and the `mindset validate` result;
+- **Blueprint:** every module of `blueprint.json` in a list (project settings, authentication,
+  the BFF and notification services, each service with its data objects and business APIs, and
+  any other section), each with its `mindset validate` problem count; picking one shows its JSON
+  and its problems in the panel next to it (a literal secret is hidden there);
 - **Mail:** what the generated services could not deliver: every mail and SMS in the mail sink,
   with its text and the codes in it (see below);
 - **Keys:** this project's keys and your global ones; set, replace, clear, delete and add.

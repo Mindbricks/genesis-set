@@ -3,6 +3,17 @@
 The package follows semantic versioning. Each release names the mind-set range it needs
 (`dependencies["@mindbricks/mind-set"]` in `package.json`).
 
+## 0.7.0 (pre-release)
+
+- **The board's Blueprint tab shows every module of the blueprint.** A list on the left holds the
+  project settings, authentication, the BFF and notification services, each service with its
+  data objects and business APIs, and any other top-level section, each with its validation
+  problem count. Picking one shows its JSON and the `mindset validate` problems inside it in a
+  panel on the right, with its path to copy.
+  - A secret written into the blueprint as a literal is hidden in the panel; `$ENV:NAME`
+    references and `ENTER_CREDENTIAL` are shown as they are.
+  - On a narrow screen the panel comes first and the list below it.
+
 ## 0.6.0 (pre-release)
 
 - **The board reads the mail sink instead of running one.** The mail sink is infrastructure like

@@ -14,7 +14,8 @@ import http from 'node:http';
 import path from 'node:path';
 import { after, afterEach, describe, test } from 'node:test';
 
-import { boardState, designDoc, interviewSummary } from '../mcp/board-data.mjs';
+import { blueprintModules, hideSecrets, isUnder, nameOf, valueAt } from '../mcp/board-blueprint.mjs';
+import { blueprintModule, boardState, designDoc, interviewSummary } from '../mcp/board-data.mjs';
 import { renderMarkdown } from '../mcp/board-md.mjs';
 import { closeBoard, ensureBoard } from '../mcp/board.mjs';
 import { keyValue } from '../mcp/key-store.mjs';
@@ -171,6 +172,87 @@ describe('the board data', () => {
   });
 });
 
+const SHOP = {
+  codename: 'cafe',
+  projectSettings: { basicSettings: { name: 'cafe' }, paymentProvidersSettings: { paymentProviders: [{ name: 'stripeMain', configuration: [
+    { name: 'secretKey', value: '$ENV:STRIPE_SECRET_KEY', secret: true },
+    { name: 'webhookSecret', value: 'ENTER_CREDENTIAL', secret: true },
+    { name: 'apiKey', value: 'abc-literal', secret: true },
+  ] }] } },
+  authentication: { authenticationEssentials: {}, loginDefinition: { userSettings: { superAdminIdentifier: 'owner@example.com' } } },
+  bffService: {},
+  notificationService: { serviceSettings: { serviceOptions: {} } },
+  services: [
+    { serviceSettings: { serviceBasics: { name: 'orders' } }, dataObjects: [{ objectSettings: { basicSettings: { name: 'order' } }, properties: [{ name: 'total' }] }], businessLogic: [{ basics: { apiOptions: { name: 'createOrder' } } }] },
+    { dataObjects: [] },
+  ],
+  edgeControllers: [{ name: 'hook' }],
+};
+
+describe('the board blueprint modules', () => {
+  test('every module of the blueprint, in groups: project, auth, BFF, notification, each service with its data objects and APIs, and any other section', () => {
+    const rows = blueprintModules(SHOP);
+    const at = (p) => rows.find((r) => r.path === p);
+    assert.deepEqual(rows[0], { path: '$', label: 'Whole blueprint', group: 'Project', depth: 0 });
+    assert.equal(at('$.projectSettings').label, 'Project settings');
+    assert.equal(at('$.projectSettings.paymentProvidersSettings').label, 'Payment providers settings');
+    assert.equal(at('$.authentication').group, 'Authentication');
+    assert.equal(at('$.authentication.loginDefinition').depth, 1);
+    assert.equal(at('$.bffService').group, 'BFF');
+    assert.equal(at('$.notificationService.serviceSettings').group, 'Notification');
+    assert.deepEqual(at('$.services[0]'), { path: '$.services[0]', label: 'orders', group: 'Services', depth: 0 });
+    assert.equal(at('$.services[0].dataObjects').count, 1);
+    assert.equal(at('$.services[0].dataObjects[0]').label, 'order');
+    assert.equal(at('$.services[0].businessLogic').label, 'Business APIs');
+    assert.equal(at('$.services[0].businessLogic[0]').label, 'createOrder');
+    assert.equal(at('$.services[1]').label, 'service 2');
+    assert.equal(at('$.edgeControllers').group, 'Other');
+    assert.equal(at('$.codename'), undefined, 'a scalar is shown inside its parent, not as a module');
+    // groups come in page order
+    assert.deepEqual([...new Set(rows.map((r) => r.group))], ['Project', 'Authentication', 'BFF', 'Notification', 'Services', 'Other']);
+  });
+
+  test('paths in the validator spelling resolve; anything else is not found', () => {
+    assert.equal(valueAt(SHOP, '$'), SHOP);
+    assert.equal(valueAt(SHOP, '$.services[0].dataObjects[0].properties[0].name'), 'total');
+    assert.equal(valueAt({ a: { 'odd-key': 1 } }, '$.a["odd-key"]'), 1);
+    for (const bad of ['', 'services', '$.services[9]', '$.services.0', '$.nope', '$..x', '$.services[0]x', '$.__proto__']) assert.equal(valueAt(SHOP, bad), undefined, bad);
+    assert.equal(isUnder('$.services[1].x', '$.services[1]'), true);
+    assert.equal(isUnder('$.services[10]', '$.services[1]'), false);
+    assert.equal(nameOf(SHOP.services[0]), 'orders');
+  });
+
+  test('a literal secret is hidden in the panel; references and the placeholder stay visible', () => {
+    const { value, hidden } = hideSecrets(SHOP.projectSettings);
+    const cfg = value.paymentProvidersSettings.paymentProviders[0].configuration;
+    assert.equal(hidden, 1);
+    assert.equal(cfg[0].value, '$ENV:STRIPE_SECRET_KEY');
+    assert.equal(cfg[1].value, 'ENTER_CREDENTIAL');
+    assert.match(cfg[2].value, /^\(hidden: a literal secret, 11 characters\)$/);
+    assert.equal(SHOP.projectSettings.paymentProvidersSettings.paymentProviders[0].configuration[2].value, 'abc-literal', 'the blueprint itself is not changed');
+  });
+
+  test('the state lists the modules with their problem counts; one module comes with its JSON and its problems', async () => {
+    const env = envFor(fakeMindSet());
+    const bp = { ...SHOP, services: [{ dataObjects: [] }, SHOP.services[0]] };
+    const p = project({ 'blueprint.json': JSON.stringify(bp) });
+    const state = await boardState({ env, project: p });
+    const at = (x) => state.blueprint.modules.find((r) => r.path === x);
+    assert.equal(at('$').errors, 1);
+    assert.equal(at('$.services[0]').errors, 1);
+    assert.equal(at('$.services[1]').errors, 0);
+    assert.equal(state.validation.problems, undefined, 'the full problem list stays on the server');
+    assert.equal(typeof state.blueprint.mtime, 'number');
+    const m = await blueprintModule(env, p, '$.services[0]');
+    assert.equal(m.label, 'service 1');
+    assert.deepEqual(m.problems, [{ level: 'error', text: 'ERROR $.services[0] required serviceSettings is required' }]);
+    const ps = await blueprintModule(env, p, '$.projectSettings');
+    assert.equal(ps.hidden, 1);
+    assert.doesNotMatch(JSON.stringify(ps), /abc-literal/);
+    assert.equal(await blueprintModule(env, p, '$.services[7]'), null);
+  });
+});
+
 describe('the board Markdown', () => {
   test('escapes everything and links only http(s) and relative targets', () => {
     const html = renderMarkdown('# T\n\n<script>alert(1)</script> **b** [x](javascript:alert(1)) [y](https://e.example) `c<d`\n\n| a | b |\n|---|---|\n| <i> | 2 |\n\n```js\n<b>\n```\n');
@@ -221,6 +303,13 @@ describe('the board server', () => {
     const doc = (await req(port, { pathName: '/api/doc?name=prd' })).json();
     assert.match(doc.html, /&lt;script&gt;/);
     assert.equal((await req(port, { pathName: '/api/doc?name=..%2Fsecret' })).status, 404);
+    // No blueprint yet: no module to show.
+    assert.equal((await req(port, { pathName: '/api/blueprint?path=%24' })).status, 404);
+    fs.writeFileSync(path.join(p.root, 'blueprint.json'), JSON.stringify(SHOP));
+    const mod = (await req(port, { pathName: '/api/blueprint?path=' + encodeURIComponent('$.services[0].businessLogic[0]') })).json().module;
+    assert.equal(mod.label, 'createOrder');
+    assert.deepEqual(mod.value, SHOP.services[0].businessLogic[0]);
+    assert.equal((await req(port, { pathName: '/api/blueprint?path=' + encodeURIComponent('$.services[5]') })).json().error.code, 'GENESIS_BOARD_NO_MODULE');
     assert.equal((await req(port, { headers: { host: 'evil.example' } })).status, 421);
 
     const write = { method: 'POST', pathName: '/api/keys', headers: { origin: `http://127.0.0.1:${port}`, 'content-type': 'application/json' }, body: { name: 'stripe-secret-key', label: 'Stripe' } };

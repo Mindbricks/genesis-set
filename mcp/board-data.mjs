@@ -14,6 +14,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { blueprintModules, hideSecrets, isUnder, valueAt, withProblemCounts } from './board-blueprint.mjs';
 import { dataDirOf } from './config.mjs';
 import { listKeys } from './key-store.mjs';
 
@@ -128,8 +129,15 @@ export function blueprintSummary(root) {
     return { file, error: `not valid JSON: ${e.message}` };
   }
   const services = Array.isArray(bp.services) ? bp.services : [];
+  let mtime = null;
+  try {
+    mtime = fs.statSync(file).mtimeMs;
+  } catch {
+    // read a moment ago; a race with a delete only loses the cache key
+  }
   return {
     file,
+    mtime,
     name: bp?.projectSettings?.basicSettings?.name ?? null,
     services: services.map((s) => ({
       name: s?.serviceSettings?.serviceBasics?.name ?? '(unnamed)',
@@ -152,6 +160,8 @@ async function validation(env, bp) {
       errors: errors.length,
       warnings: warnings.length,
       first: errors.slice(0, 10).map((p) => lib.formatProblem(p)),
+      // Every problem, for the module counts and the module panel; not sent in the state.
+      problems: [...errors, ...warnings].map((p) => ({ level: p.level, path: String(p.path ?? ''), text: lib.formatProblem(p) })),
     };
   } catch (e) {
     return { available: false, error: e.message };
@@ -255,18 +265,45 @@ export async function boardState({ env = process.env, project }) {
   const files = designFiles(project.root);
   const pipeline = readJson(path.join(mindSetCorpusDir(env), 'procedures', 'design', 'pipeline.json'));
   const bp = blueprintSummary(project.root);
+  const v = await validation(env, bp);
   const state = {
     project: { id: project.id, name: project.name, root: project.root },
     flow: await flow(env, project.root, pipeline, files),
     interview: interviewSummary(files.has('interview-record') ? readText(files.get('interview-record').file) : null),
-    blueprint: bp ? { file: bp.file, name: bp.name ?? null, services: bp.services ?? [], error: bp.error ?? null } : null,
-    validation: await validation(env, bp),
+    blueprint: bp ? { file: bp.file, name: bp.name ?? null, services: bp.services ?? [], error: bp.error ?? null, mtime: bp.mtime ?? null } : null,
+    validation: v ? (({ problems, ...summary }) => summary)(v) : v,
     // A blueprint with no design document: the design was skipped, which the standard allows.
     designSkipped: Boolean(bp) && files.size === 0,
     keys,
   };
+  if (bp && !bp.error) state.blueprint.modules = withProblemCounts(blueprintModules(bp.raw), v?.problems ?? []);
   state.next = nextStep(state);
   return state;
+}
+
+/**
+ * One module of the blueprint for the board's panel: its JSON (literal secrets hidden) and the
+ * validation problems at or below it. Null when there is no readable blueprint or no such path.
+ */
+export async function blueprintModule(env, project, modulePath) {
+  const bp = blueprintSummary(project.root);
+  if (!bp || bp.error) return null;
+  const node = valueAt(bp.raw, modulePath);
+  if (node === undefined) return null;
+  const row = blueprintModules(bp.raw).find((r) => r.path === modulePath);
+  const v = await validation(env, bp);
+  const problems = (v?.problems ?? []).filter((p) => isUnder(p.path, modulePath));
+  const { value, hidden } = hideSecrets(node);
+  return {
+    path: modulePath,
+    label: row?.label ?? modulePath,
+    group: row?.group ?? null,
+    value,
+    hidden,
+    validated: Boolean(v?.available),
+    problems: problems.slice(0, 200).map((p) => ({ level: p.level, text: p.text })),
+    problemCount: problems.length,
+  };
 }
 
 /** One design document's text, by name; null for a name that is not a document of this project. */

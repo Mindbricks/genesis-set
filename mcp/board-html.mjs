@@ -60,6 +60,15 @@ h2 { font-size: 16px; margin: 0 0 10px; }
 .md pre code { background: none; padding: 0; }
 .md blockquote { margin: 8px 0; padding: 4px 12px; border-left: 3px solid var(--line); color: var(--muted); }
 .md a { color: var(--accent); }
+.tree { position: sticky; top: 112px; max-height: calc(100vh - 128px); overflow-y: auto; }
+.tree .group { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 12px 10px 4px; }
+.tree .group:first-child { margin-top: 0; }
+.tree .row { border-top: none; gap: 6px; }
+.tree .row.d1 { padding-left: 24px; }
+.tree .row.d2 { padding-left: 40px; font-size: 13.5px; }
+.json { white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--soft); padding: 12px; border-radius: 8px; margin: 10px 0 0; }
+.json .k { color: var(--accent); } .json .s { color: var(--ok); } .json .n, .json .b { color: var(--warn); }
+@media (max-width: 760px) { .tree { position: static; max-height: 45vh; } .bpsplit > .tree { order: 1; } }
 .table { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; font-size: 14px; }
 th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
@@ -99,7 +108,7 @@ const SCRIPT = `
   const main = document.getElementById('main');
   const flash = document.getElementById('flash');
   const TABS = ['overview', 'documents', 'interview', 'blueprint', 'mail', 'keys'];
-  let state = null, shown = '', docCache = new Map();
+  let state = null, shown = '', docCache = new Map(), moduleCache = new Map(), afterRender = null;
 
   function el(tag, cls, text) {
     const e = document.createElement(tag);
@@ -215,12 +224,9 @@ const SCRIPT = `
     return card;
   }
 
-  function blueprint() {
+  function blueprintSummaryCard(b, v) {
     const card = el('section', 'card');
-    const b = state.blueprint, v = state.validation;
     card.append(el('h2', '', 'Blueprint'));
-    if (!b) { card.append(el('p', 'muted', 'No blueprint.json yet. It is written after the design documents.')); return card; }
-    if (b.error) { card.append(el('p', 'note', b.error)); return card; }
     const r = el('div', 'row'); r.append(el('span', 'grow', b.name ? 'Project ' + b.name : 'blueprint.json'));
     if (v && v.available) r.append(el('span', 'chip ' + (v.errors ? 'bad' : v.warnings ? 'warn' : 'ok'), v.errors ? v.errors + ' error(s)' : v.warnings ? v.warnings + ' warning(s)' : 'Valid'));
     else r.append(el('span', 'chip idle', 'Not validated'));
@@ -230,7 +236,91 @@ const SCRIPT = `
     const th = el('thead'); th.append(tr); t.append(th); const tb = el('tbody');
     for (const s of b.services) { const r2 = el('tr'); r2.append(el('td', 'doc', s.name), el('td', '', String(s.dataObjects)), el('td', '', String(s.businessApis))); tb.append(r2); }
     t.append(tb); const w = el('div', 'table'); w.append(t); card.append(w);
+    card.append(el('p', 'small muted', 'Pick a module on the left to see its part of blueprint.json and the validation problems inside it.'));
     return card;
+  }
+
+  /** JSON as text nodes and colored spans (never HTML), indented two spaces. */
+  function jsonInto(v, ind, out) {
+    const pad = '  '.repeat(ind);
+    if (Array.isArray(v)) {
+      if (!v.length) { out.append('[]'); return; }
+      out.append('[\\n');
+      v.forEach(function (x, i) { out.append(pad + '  '); jsonInto(x, ind + 1, out); out.append(i < v.length - 1 ? ',\\n' : '\\n'); });
+      out.append(pad + ']'); return;
+    }
+    if (v && typeof v === 'object') {
+      const ks = Object.keys(v);
+      if (!ks.length) { out.append('{}'); return; }
+      out.append('{\\n');
+      ks.forEach(function (k, i) { out.append(pad + '  ', el('span', 'k', JSON.stringify(k)), ': '); jsonInto(v[k], ind + 1, out); out.append(i < ks.length - 1 ? ',\\n' : '\\n'); });
+      out.append(pad + '}'); return;
+    }
+    out.append(el('span', typeof v === 'string' ? 's' : typeof v === 'number' ? 'n' : 'b', JSON.stringify(v)));
+  }
+
+  async function blueprint(arg) {
+    const b = state.blueprint, v = state.validation;
+    if (!b || b.error) {
+      const card = el('section', 'card'); card.append(el('h2', '', 'Blueprint'));
+      card.append(b ? el('p', 'note', b.error) : el('p', 'muted', 'No blueprint.json yet. It is written after the design documents.'));
+      return card;
+    }
+    const mods = b.modules || [];
+    const pick = mods.some(function (m) { return m.path === arg; }) ? arg : '';
+    const wrap = el('div', 'split bpsplit');
+    const list = el('section', 'card list tree');
+    // A re-render keeps the list where the user scrolled it, and shows the picked row.
+    const before = main.querySelector('.tree');
+    const keep = before ? before.scrollTop : 0;
+    afterRender = function () {
+      list.scrollTop = keep;
+      const on = list.querySelector('.row.on');
+      if (on && (on.offsetTop < list.scrollTop || on.offsetTop + on.offsetHeight > list.scrollTop + list.clientHeight)) list.scrollTop = Math.max(0, on.offsetTop - 40);
+    };
+    let group = null;
+    for (const m of mods) {
+      if (m.group !== group) { group = m.group; list.append(el('div', 'group', group)); }
+      const r = el('div', 'row link d' + m.depth + (m.path === pick ? ' on' : ''));
+      r.title = m.path;
+      r.append(el('span', 'grow', m.label));
+      if (typeof m.count === 'number') r.append(el('span', 'small muted', String(m.count)));
+      if (m.errors) r.append(el('span', 'chip bad', String(m.errors)));
+      else if (m.warnings) r.append(el('span', 'chip warn', String(m.warnings)));
+      r.addEventListener('click', function () { window.scrollTo(0, 0); location.hash = '#blueprint/' + encodeURIComponent(m.path); });
+      list.append(r);
+    }
+    if (!pick) { wrap.append(list, blueprintSummaryCard(b, v)); return wrap; }
+    const row = mods.find(function (m) { return m.path === pick; });
+    const view = el('section', 'card');
+    const head = el('div', 'row');
+    head.append(el('h2', 'grow', row.label));
+    if (row.errors) head.append(el('span', 'chip bad', row.errors + ' error(s)'));
+    else if (row.warnings) head.append(el('span', 'chip warn', row.warnings + ' warning(s)'));
+    else if (v && v.available) head.append(el('span', 'chip ok', 'No problems'));
+    const copy = el('button', '', 'Copy path');
+    copy.addEventListener('click', function () {
+      navigator.clipboard.writeText(pick).then(function () { say('Path copied', 'ok'); }, function () { say('Copy failed: the path is ' + pick, 'err'); });
+    });
+    head.append(copy);
+    view.append(head, el('div', 'doc small muted', pick));
+    const body = el('div', '', 'Loading...'); view.append(body);
+    wrap.append(list, view);
+    const key = pick + '@' + b.mtime;
+    try {
+      if (!moduleCache.has(key)) moduleCache.set(key, (await api('GET', '/api/blueprint?path=' + encodeURIComponent(pick))).module);
+      const m = moduleCache.get(key);
+      body.replaceChildren();
+      if (m.problems.length) {
+        const ul = el('ul', 'small');
+        for (const p of m.problems) ul.append(el('li', 'doc', p.text));
+        body.append(ul);
+        if (m.problemCount > m.problems.length) body.append(el('p', 'small muted', (m.problemCount - m.problems.length) + ' more; run mindset validate for the full list.'));
+      }
+      if (m.hidden) body.append(el('p', 'note', m.hidden + ' literal secret value(s) hidden here. A blueprint holds references, not secrets: use $ENV:NAME or ENTER_CREDENTIAL, and rotate a key that was written here.'));
+      const pre = el('pre', 'json'); jsonInto(m.value, 0, pre); body.append(pre);
+    } catch (e) { body.textContent = e.message; }
+    return wrap;
   }
 
   /** A message's title: its subject, marked SMS unless the subject already says so. */
@@ -361,8 +451,10 @@ const SCRIPT = `
     if (sig === shown && !force) return;
     if (!force && tab === 'keys' && typing()) return;
     shown = sig;
-    const content = tab === 'overview' ? overview() : tab === 'documents' ? await documents(arg) : tab === 'interview' ? interview() : tab === 'blueprint' ? blueprint() : tab === 'mail' ? await mail(arg) : keys();
+    const content = tab === 'overview' ? overview() : tab === 'documents' ? await documents(arg) : tab === 'interview' ? interview() : tab === 'blueprint' ? await blueprint(arg) : tab === 'mail' ? await mail(arg) : keys();
     main.replaceChildren(content);
+    // A view that needs its own layout settled (the blueprint list scroll) runs after it is in the page.
+    if (afterRender) { const f = afterRender; afterRender = null; f(); }
   }
 
   async function load(force) {
