@@ -59,12 +59,13 @@ describe('MCP registration at install', () => {
     assert.match(toml, /\[mcp_servers\.genesis\]\ncommand = ".+"\nargs = \[".+server\.mjs"\]/);
     assert.ok(toml.includes(JSON.stringify(serverOf(home))));
 
-    // the registered command really serves the five API tools and the four key tools
+    // the registered command really serves the five API tools, the four key tools and the board tool
     assert.deepEqual(listTools(process.execPath, [serverOf(home)], { HOME: home, PATH: process.env.PATH }), [
       'genesis_buildService',
       'genesis_getBuilds',
       'genesis_getServiceBuild',
       'genesis_listKeys',
+      'genesis_openBoard',
       'genesis_openKeyManager',
       'genesis_requestKey',
       'genesis_validateApplication',

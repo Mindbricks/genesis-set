@@ -14,6 +14,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { resolveSettings } from './config.mjs';
+import { closeBoard } from './board.mjs';
 import { closeKeyPage } from './key-page.mjs';
 import { TOOLS, hasTool, runTool } from './tools.mjs';
 
@@ -38,6 +39,7 @@ const INSTRUCTIONS =
   'Blueprint paths are read on this machine and sent inline. Every failure is a Genesis error { error: { code, message, details } }: report the code. ' +
   'Keys (the Genesis API key, provider secrets): never ask for a value in the chat. Register the key with genesis_requestKey, give the user the local key page link it answers, and check genesis_listKeys; ' +
   'genesis_writeKeyToEnvFile puts a stored key into a gitignored env file without you seeing it. ' +
+  'In a genesis project, genesis_openBoard gives the project board (design flow, documents, interview, blueprint, keys): offer it when a design document is written, and answer "where can I follow this?" with it. ' +
   'The genesis-compiler-api skill has the full procedure.';
 
 /**
@@ -148,7 +150,7 @@ export function serve({ input = process.stdin, output = process.stdout, log = (l
     maybeFinish();
   });
   // The key page lives only as long as this server.
-  return done.then(() => closeKeyPage());
+  return done.then(() => Promise.all([closeKeyPage(), closeBoard()]));
 }
 
 function isMain() {

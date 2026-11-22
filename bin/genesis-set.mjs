@@ -24,6 +24,7 @@ Usage:
   genesis uninstall [--dry-run]
   genesis doctor
   genesis config [show | set-key | unset-key | set-base <url> | unset-base]
+  genesis board [<folder>] [--no-open]
   genesis keys [--no-open]
   genesis mcp
   genesis --version | --help
@@ -56,6 +57,14 @@ uninstall  removes only what install recorded in ~/.genesis-set/installed.json;
 doctor     both versions (genesis-set and mind-set) and whether they are
            compatible, the skills and the MCP server per agent, where the API
            key comes from (never its value) and the API base.
+board      opens the project board of the genesis project in <folder>
+           (default: the current one; "genesis init" makes a project): the
+           design flow with each document's state and check, the documents,
+           the interview, the blueprint and its validation, and the project's
+           and your global keys. It runs on 127.0.0.1:${'4747'} (or the next free
+           port) until it is idle for an hour or Ctrl+C; a board already
+           running for the project is reused. The link it opens can change
+           keys; the plain address (bookmark it) is read-only.
 keys       opens the local key page in your browser (the page the agent
            links to): add, change, clear or delete the keys your agent uses.
            The link is new every time; the page closes after 15 idle minutes
@@ -96,6 +105,7 @@ const KNOWN_FLAGS = {
   doctor: [],
   config: [],
   keys: ['noOpen'],
+  board: ['noOpen'],
   mcp: [],
 };
 
@@ -125,6 +135,37 @@ async function main(argv) {
       return 2;
     }
     return initProject({ dir: positional[1] ?? process.cwd(), env: process.env, out, err, dryRun: flags.dryRun === true });
+  }
+  if (command === 'board') {
+    if (positional.length > 2) {
+      err('error: board takes one folder at most');
+      return 2;
+    }
+    const { findProject } = await import('../mcp/project.mjs');
+    const folder = path.resolve(positional[1] ?? process.cwd());
+    const project = findProject(folder);
+    if (!project) {
+      err(`error: ${folder} is not a genesis project. Run "genesis init" there first (or "genesis keys" for your global keys).`);
+      return 1;
+    }
+    const { ensureBoard, boardClosed, closeBoard } = await import('../mcp/board.mjs');
+    const { openInBrowser } = await import('../mcp/key-tools.mjs');
+    const board = await ensureBoard({ env: process.env, project });
+    out(`Genesis board for "${project.name}": ${board.readUrl}`);
+    if (flags.noOpen !== true && !openInBrowser(board.url)) out('Could not open a browser: open the link yourself.');
+    if (board.reused && board.idleMinutes === null) {
+      out(board.url === board.readUrl ? 'The board already runs in another process (read-only link).' : 'The board already runs in another process; opened it there.');
+      return 0;
+    }
+    if (flags.noOpen === true) out(`To change keys, open: ${board.url}`);
+    out(`It closes after ${board.idleMinutes} idle minutes, or press Ctrl+C.`);
+    process.once('SIGINT', () => closeBoard());
+    process.once('SIGTERM', () => closeBoard());
+    const keepAlive = setInterval(() => {}, 1 << 30);
+    await boardClosed();
+    clearInterval(keepAlive);
+    out('The board is closed.');
+    return 0;
   }
   if (command === 'keys') {
     const { ensureKeyPage, keyPageClosed, closeKeyPage } = await import('../mcp/key-page.mjs');

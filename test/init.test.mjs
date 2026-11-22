@@ -35,6 +35,9 @@ describe('genesis init', () => {
       assert.match(text, /Never hand-write backend code/);
     }
     assert.ok(fs.existsSync(path.join(dir, 'design', 'README.md')));
+    const identity = JSON.parse(read(path.join(dir, '.genesis', 'project.json')));
+    assert.equal(identity.name, 'shop');
+    assert.match(res.stdout, new RegExp(`Project "shop" \\(id ${identity.id}\\)`));
     const ignore = read(path.join(dir, '.gitignore')).split('\n');
     for (const l of GITIGNORE_LINES) assert.ok(ignore.includes(l), l);
     assert.match(res.stdout, /Genesis API key: not set\. Create one at https:\/\/portal\.genesiscompiler\.com\/keys/);
@@ -45,7 +48,7 @@ describe('genesis init', () => {
   test('a second run changes nothing', () => {
     const dir = tempDir();
     assert.equal(init([dir]).code, 0);
-    const before = Object.fromEntries(['CLAUDE.md', 'AGENTS.md', '.gitignore', 'design/README.md'].map((f) => [f, read(path.join(dir, f))]));
+    const before = Object.fromEntries(['CLAUDE.md', 'AGENTS.md', '.gitignore', 'design/README.md', '.genesis/project.json'].map((f) => [f, read(path.join(dir, f))]));
     const again = init([dir]);
     assert.equal(again.code, 0);
     assert.match(again.stdout, /CLAUDE\.md: up to date/);

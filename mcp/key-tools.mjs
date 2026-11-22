@@ -7,6 +7,7 @@
 //   genesis_listKeys           every key: name, label, description, set / empty
 //   genesis_openKeyManager     the page link, to manage every key
 //   genesis_writeKeyToEnvFile  copy a stored value into a gitignored env file
+//   genesis_openBoard          the project board (flow, documents, blueprint, keys)
 //
 // They work without a Genesis API key: the first one is how the user sets it.
 
@@ -15,12 +16,21 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { genesisError } from './client.mjs';
+import { ensureBoard } from './board.mjs';
 import { ensureKeyPage } from './key-page.mjs';
-import { BUILTIN_KEY, KeyStoreError, checkKeyName, findKey, keyValue, listKeys, requestKey } from './key-store.mjs';
+import { BUILTIN_KEY, KeyStoreError, SCOPES, checkKeyName, findKey, keyValue, listKeys, requestKey } from './key-store.mjs';
+import { findProject } from './project.mjs';
 
 const KEY_NAME = {
   type: 'string',
   description: `The key's name: lowercase kebab-case, for example "stripe-secret-key". "${BUILTIN_KEY}" is the Genesis API key itself.`,
+};
+const SCOPE = {
+  type: 'string',
+  enum: SCOPES,
+  description:
+    'Where the key is stored: "project" (this genesis project only; the default inside a project, see genesis init) or "global" (every project of this user). ' +
+    'Both live in the user\'s home, never in the project folder.',
 };
 const OPEN = {
   type: 'boolean',
@@ -44,6 +54,7 @@ export const KEY_TOOLS = [
           type: 'string',
           description: 'What the key is for and where the user gets it, shown on the page (for example "Stripe dashboard, Developers > API keys; a test-mode key starting sk_test_").',
         },
+        scope: SCOPE,
         open: OPEN,
       },
       required: ['name', 'label'],
@@ -54,7 +65,7 @@ export const KEY_TOOLS = [
   {
     name: 'genesis_listKeys',
     title: 'List the keys of the local key store',
-    description: 'Every key of the local key store with its label, description and status (set or empty). Values are never answered.',
+    description: 'Every key this folder can use: the project\'s keys (inside a genesis project) and the global ones, each with its scope, label, description and status (set or empty). Values are never answered.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
@@ -77,11 +88,22 @@ export const KEY_TOOLS = [
         name: KEY_NAME,
         file: { type: 'string', description: 'The env file (absolute, or relative to the folder the agent was started in).' },
         variable: { type: 'string', description: 'The variable name in the file, for example STRIPE_SECRET_KEY.' },
+        scope: { ...SCOPE, description: 'Read the key from this scope only. Default: the project\'s key when there is one, else the global key.' },
       },
       required: ['name', 'file', 'variable'],
       additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: 'genesis_openBoard',
+    title: 'Open the project board',
+    description:
+      'The link of the local project board for the genesis project of this folder: the design flow with the state and check of every document, the documents themselves, ' +
+      'the interview, the blueprint with its validation, and the project and global keys. Offer it when a design document is written or the user asks where to follow the work; ' +
+      'the user can also open it any time with "genesis board" in the project folder. Works on this machine only.',
+    inputSchema: { type: 'object', properties: { open: OPEN }, additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: false },
   },
 ];
 
@@ -177,40 +199,65 @@ async function pageLink(settings, open) {
   return { ...link, opened };
 }
 
+/** The project board's links (the write link opens the Keys tab when `tab` says so). */
+async function boardLink(settings, project, { open, tab } = {}) {
+  const b = await ensureBoard({ env: settings.env ?? process.env, project });
+  const hash = tab ? `#${tab}` : '';
+  const url = `${b.url}${hash}`;
+  const opened = open === true ? openInBrowser(url) : false;
+  return { url, readUrl: `${b.readUrl}${hash}`, port: b.port, opened, reopen: 'genesis board (in the project folder)' };
+}
+
 const HANDLERS = {
   async genesis_requestKey(args, settings) {
     const env = settings.env ?? process.env;
-    const key = forAgent(requestKey(env, { name: args.name, label: args.label, description: args.description }));
-    const link = await pageLink(settings, args.open);
+    const project = findProject(settings.cwd ?? process.cwd());
+    const scope = args.name === BUILTIN_KEY ? 'global' : args.scope ?? (project ? 'project' : 'global');
+    const key = forAgent(requestKey(env, { name: args.name, label: args.label, description: args.description }, { scope, project }));
+    // Inside a project the keys are on the board (project and global); outside, on the global key page.
+    const link = project ? await boardLink(settings, project, { open: args.open, tab: 'keys' }) : await pageLink(settings, args.open);
     return {
       key,
+      ...(project ? { project: { name: project.name, root: project.root } } : {}),
       keyPage: link,
       next:
         key.status === 'set'
           ? `"${key.label}" is already set. Use it; the user can change it on the key page.`
           : `Ask the user to open ${link.url} on this machine and save "${key.label}" there, then call genesis_listKeys to see it set. ` +
-            'Never ask for the value in the chat. Later the user can open the page themselves with "genesis keys" in a terminal.',
+            `Never ask for the value in the chat. Later the user can open it themselves with ${project ? '"genesis board" in the project folder' : '"genesis keys"'} in a terminal.`,
     };
   },
   async genesis_listKeys(_args, settings) {
-    return { keys: listKeys(settings.env ?? process.env).map(forAgent) };
+    const project = findProject(settings.cwd ?? process.cwd());
+    return {
+      ...(project ? { project: { name: project.name, root: project.root } } : { project: null }),
+      keys: listKeys(settings.env ?? process.env, { project }).map(forAgent),
+    };
   },
   async genesis_openKeyManager(args, settings) {
     return { keyPage: await pageLink(settings, args.open) };
+  },
+  async genesis_openBoard(args, settings) {
+    const project = findProject(settings.cwd ?? process.cwd());
+    if (!project) {
+      throw new KeyStoreError('GENESIS_KEY_NO_PROJECT', 'this folder is not a genesis project; run "genesis init" in the project folder first', 409);
+    }
+    return { project: { name: project.name, root: project.root }, board: await boardLink(settings, project, { open: args.open }) };
   },
   async genesis_writeKeyToEnvFile(args, settings) {
     const env = settings.env ?? process.env;
     checkKeyName(args.name);
     if (!VARIABLE.test(args.variable)) throw new KeyStoreError('GENESIS_KEY_BAD_INPUT', `"${args.variable}" is not an env variable name`);
-    const row = findKey(env, args.name);
-    if (!row) throw new KeyStoreError('GENESIS_KEY_NOT_FOUND', `no key named "${args.name}"; register it with genesis_requestKey`, 404);
-    const value = keyValue(env, args.name);
+    const project = findProject(settings.cwd ?? process.cwd());
+    const row = findKey(env, args.name, { scope: args.scope, project });
+    if (!row) throw new KeyStoreError('GENESIS_KEY_NOT_FOUND', `no key named "${args.name}"${args.scope ? ` in the ${args.scope} scope` : ''}; register it with genesis_requestKey`, 404);
+    const value = args.scope === 'global' ? keyValue(env, args.name) : keyValue(env, args.name, { project: row.scope === 'project' ? project : null });
     if (!value) throw new KeyStoreError('GENESIS_KEY_NOT_SET', `"${row.label}" has no value yet; ask the user to save it on the key page (genesis_openKeyManager)`, 409);
     const file = path.resolve(settings.cwd ?? process.cwd(), args.file);
     const refusal = envFileRefusal(file);
     if (refusal) throw new KeyStoreError('GENESIS_ENV_FILE_REFUSED', refusal, 422);
     const { created, replaced } = writeEnvVariable(file, args.variable, value);
-    return { written: true, key: args.name, file, variable: args.variable, created, replaced };
+    return { written: true, key: args.name, scope: row.scope, file, variable: args.variable, created, replaced };
   },
 };
 

@@ -3,6 +3,25 @@
 The package follows semantic versioning. Each release names the mind-set range it needs
 (`dependencies["@mindbricks/mind-set"]` in `package.json`).
 
+## 0.4.0 (pre-release)
+
+- **`genesis board`:** a local board for a genesis project. It is read live from the folder and
+  shows:
+  - the design flow with each document's state and `design-check` result;
+  - the rendered documents;
+  - the interview (status, coverage ledger, open questions);
+  - the blueprint with its validation;
+  - the project and global keys;
+  - the next step.
+
+  It runs on 127.0.0.1:4747 (bookmarkable, read-only); the link `genesis board` opens can
+  change keys. One board per project, reused. The agent gets it with `genesis_openBoard`, and
+  the `genesis init` instructions tell it to offer the board.
+- **Projects:** `genesis init` writes `.genesis/project.json` (a random id and a name).
+- **Project keys:** they live in the home folder under that id. Inside a project,
+  `genesis_requestKey` stores a project key by default, `genesis_listKeys` labels each key's
+  scope, and `genesis_writeKeyToEnvFile` prefers the project key. `genesis keys` stays global.
+
 ## 0.3.0 (pre-release)
 
 - `genesis init [<folder>] [--dry-run]` prepares a project folder so the agent works the

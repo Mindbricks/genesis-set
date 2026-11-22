@@ -13,6 +13,7 @@
 // uses a key (writing a gitignored env file), never for a tool answer.
 
 import { API_KEY_ENV, configPathOf, maskSecret, readConfigFile, writeConfigFile } from './config.mjs';
+import { projectKeysFile } from './project.mjs';
 
 export const BUILTIN_KEY = 'genesis-api-key';
 const BUILTIN_LABEL = 'Genesis API key';
@@ -38,17 +39,32 @@ function now() {
   return new Date().toISOString();
 }
 
-function load(env) {
-  const file = configPathOf(env);
+/**
+ * Where a scope's keys live. `global`: the genesis-set config file. `project`:
+ * the project's keys file under the user's home (never the project folder);
+ * it needs the project (`findProject`).
+ */
+export const SCOPES = ['project', 'global'];
+
+function checkScope(scope, project) {
+  if (!SCOPES.includes(scope)) throw new KeyStoreError('GENESIS_KEY_BAD_INPUT', `scope must be one of: ${SCOPES.join(', ')}`);
+  if (scope === 'project' && !project) {
+    throw new KeyStoreError('GENESIS_KEY_NO_PROJECT', 'this folder is not a genesis project; run "genesis init" here, or use the global scope', 409);
+  }
+}
+
+function load(env, scope = 'global', project = null) {
+  checkScope(scope, project);
+  const file = scope === 'project' ? projectKeysFile(env, project.id) : configPathOf(env);
   const cfg = readConfigFile(file);
   if (cfg.__error) throw new KeyStoreError('GENESIS_KEY_STORE_UNREADABLE', `${cfg.__error}; fix or delete it first`, 500);
   const keys = cfg.keys && typeof cfg.keys === 'object' && !Array.isArray(cfg.keys) ? { ...cfg.keys } : {};
-  return { file, cfg, keys };
+  return { file, cfg, keys, scope };
 }
 
-function save({ file, cfg, keys }) {
+function save({ file, cfg, keys, scope }) {
   const next = { ...cfg, keys };
-  if (Object.keys(keys).length === 0) delete next.keys;
+  if (Object.keys(keys).length === 0 && scope !== 'project') delete next.keys;
   for (const [k, v] of Object.entries(next)) if (v === undefined) delete next[k];
   writeConfigFile(file, next);
 }
@@ -80,7 +96,7 @@ function checkValue(value) {
   return v;
 }
 
-function row(name, entry, { builtin = false, envOverride = false, envValue = null } = {}) {
+function row(name, entry, { builtin = false, envOverride = false, envValue = null, scope = 'global' } = {}) {
   const value = typeof entry.value === 'string' && entry.value ? entry.value : null;
   // The key in effect: for the Genesis API key the environment variable wins over the file.
   return {
@@ -88,6 +104,7 @@ function row(name, entry, { builtin = false, envOverride = false, envValue = nul
     label: entry.label || name,
     description: entry.description || '',
     builtin,
+    scope,
     status: value || envOverride ? 'set' : 'empty',
     ...(envOverride ? { source: API_KEY_ENV } : {}),
     masked: maskSecret(envOverride ? envValue : value),
@@ -99,7 +116,7 @@ function row(name, entry, { builtin = false, envOverride = false, envValue = nul
  * Every key, the built-in Genesis API key first. `masked` (the type prefix and
  * the last four characters, see maskSecret) is for the page; the tools drop it.
  */
-export function listKeys(env = process.env) {
+export function listKeys(env = process.env, { project = null } = {}) {
   const { cfg, keys } = load(env);
   const envKey = typeof env[API_KEY_ENV] === 'string' && env[API_KEY_ENV].trim() !== '';
   const rows = [
@@ -109,6 +126,14 @@ export function listKeys(env = process.env) {
       { builtin: true, envOverride: envKey, envValue: envKey ? env[API_KEY_ENV] : null },
     ),
   ];
+  if (project) {
+    const p = load(env, 'project', project);
+    for (const name of Object.keys(p.keys).sort()) {
+      if (!KEY_NAME_PATTERN.test(name) || name === BUILTIN_KEY) continue;
+      const e = p.keys[name];
+      if (e && typeof e === 'object') rows.push(row(name, e, { scope: 'project' }));
+    }
+  }
   for (const name of Object.keys(keys).sort()) {
     if (!KEY_NAME_PATTERN.test(name) || name === BUILTIN_KEY) continue;
     const e = keys[name];
@@ -117,20 +142,23 @@ export function listKeys(env = process.env) {
   return rows;
 }
 
-export function findKey(env, name) {
-  return listKeys(env).find((k) => k.name === name) ?? null;
+/** A key's row: in `scope` when given, else the project's first, then the global one. */
+export function findKey(env, name, { scope, project = null } = {}) {
+  const rows = listKeys(env, { project }).filter((k) => k.name === name);
+  if (scope) return rows.find((k) => k.scope === scope) ?? null;
+  return rows.find((k) => k.scope === 'project') ?? rows.find((k) => k.scope === 'global') ?? null;
 }
 
 /**
  * Registers a key (or updates its label and description); an existing value is
  * kept. The built-in key is only reported.
  */
-export function requestKey(env, { name, label, description }) {
+export function requestKey(env, { name, label, description }, { scope = 'global', project = null } = {}) {
   checkKeyName(name);
-  if (name === BUILTIN_KEY) return findKey(env, name);
+  if (name === BUILTIN_KEY) return findKey(env, name, { scope: 'global', project });
   const l = cleanText(label, MAX_LABEL, 'label');
   const d = cleanText(description, MAX_DESCRIPTION, 'description');
-  const store = load(env);
+  const store = load(env, scope, project);
   const prev = store.keys[name] && typeof store.keys[name] === 'object' ? store.keys[name] : null;
   const at = now();
   store.keys[name] = {
@@ -141,13 +169,14 @@ export function requestKey(env, { name, label, description }) {
     updatedAt: prev ? prev.updatedAt ?? at : at,
   };
   save(store);
-  return findKey(env, name);
+  return findKey(env, name, { scope, project });
 }
 
-export function setKeyValue(env, name, value) {
+export function setKeyValue(env, name, value, { scope = 'global', project = null } = {}) {
   checkKeyName(name);
   const v = checkValue(value);
-  const store = load(env);
+  if (name === BUILTIN_KEY) scope = 'global';
+  const store = load(env, scope, project);
   const at = now();
   if (name === BUILTIN_KEY) {
     if (/\s/.test(v)) throw new KeyStoreError('GENESIS_KEY_BAD_INPUT', 'the Genesis API key must not contain whitespace');
@@ -158,12 +187,13 @@ export function setKeyValue(env, name, value) {
     store.keys[name] = { ...prev, value: v, updatedAt: at };
   }
   save(store);
-  return findKey(env, name);
+  return findKey(env, name, { scope, project });
 }
 
-export function clearKeyValue(env, name) {
+export function clearKeyValue(env, name, { scope = 'global', project = null } = {}) {
   checkKeyName(name);
-  const store = load(env);
+  if (name === BUILTIN_KEY) scope = 'global';
+  const store = load(env, scope, project);
   if (name === BUILTIN_KEY) {
     store.cfg = { ...store.cfg, apiKey: undefined, apiKeyUpdatedAt: undefined };
   } else {
@@ -173,23 +203,27 @@ export function clearKeyValue(env, name) {
     store.keys[name] = { ...rest, updatedAt: now() };
   }
   save(store);
-  return findKey(env, name);
+  return findKey(env, name, { scope, project });
 }
 
-export function deleteKey(env, name) {
+export function deleteKey(env, name, { scope = 'global', project = null } = {}) {
   checkKeyName(name);
   if (name === BUILTIN_KEY) {
     throw new KeyStoreError('GENESIS_KEY_BUILTIN', 'the Genesis API key cannot be deleted; clear its value instead');
   }
-  const store = load(env);
+  const store = load(env, scope, project);
   if (!(name in store.keys)) throw new KeyStoreError('GENESIS_KEY_NOT_FOUND', `no key named "${name}"`, 404);
   delete store.keys[name];
   save(store);
 }
 
 /** A stored value, for the code that uses the key. Never put it in a tool answer. */
-export function keyValue(env, name) {
+export function keyValue(env, name, { project = null } = {}) {
   checkKeyName(name);
+  if (project && name !== BUILTIN_KEY) {
+    const p = load(env, 'project', project).keys[name];
+    if (p && typeof p === 'object' && typeof p.value === 'string' && p.value) return p.value;
+  }
   const { cfg, keys } = load(env);
   if (name === BUILTIN_KEY) {
     const fromEnv = typeof env[API_KEY_ENV] === 'string' ? env[API_KEY_ENV].trim() : '';

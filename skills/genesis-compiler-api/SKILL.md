@@ -28,6 +28,9 @@ service build's result is `{{CORPUS}}/genesis/compile-results.md`.
    easiest way for the user is the local key page: `genesis_requestKey` with
    `name: "genesis-api-key"` answers its link; then check `genesis_listKeys`. Never ask for the key
    in the chat, never write it into a file, never print it.
+4. In a genesis project (`genesis init` made it), the user follows the work on the project board:
+   `genesis_openBoard` gives its link (the user opens it with `genesis board`). Offer it when a
+   build finishes or the user asks where to see the project.
 
 ## The calls
 

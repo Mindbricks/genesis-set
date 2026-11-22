@@ -40,8 +40,9 @@ which the agents read at the start of every session:
 - the order of work with the skill for each step;
 - the key rules.
 
-It also creates `design/` and the env and secrets lines of `.gitignore`, then prints the API
-key status and a starter prompt.
+It also writes the project identity `.genesis/project.json` (a random id and a name, no secret,
+fine to commit), creates `design/` and the env and secrets lines of `.gitignore`, and prints the
+API key status and a starter prompt.
 - Your own content in `CLAUDE.md` and `AGENTS.md` is kept.
 - A second run only refreshes the block.
 - `--dry-run` shows what it would write.
@@ -53,6 +54,29 @@ Let us design a new application with OpenAPPL and compile it with Genesis: a tab
 system for cafes, with owner, waiter and guest roles. Start with the requirements interview.
 ```
 
+## The project board
+
+`genesis board` in a project folder opens the project's board in your browser. The board is read
+live from the folder as the agent writes, and shows:
+- **Overview:** the next step, and the design flow from the interview to the test report, with
+  every document written, waiting or "if needed" and its `design-check` result;
+- **Documents:** every design document, rendered;
+- **Interview:** its status, the coverage ledger and the open questions;
+- **Blueprint:** its services, data objects and APIs, and the `mindset validate` result;
+- **Keys:** this project's keys and your global ones; set, replace, clear, delete and add.
+
+The board runs on `http://127.0.0.1:4747/` (the next free port if that one is taken;
+`GENESIS_BOARD_PORT` moves it) until it is idle for an hour or you press Ctrl+C.
+- **Bookmark it:** the plain address is read-only.
+- **Changing keys** takes the link `genesis board` opens, which sets a write cookie for that run.
+- **One board per project:** a second `genesis board` for the same project reuses the running
+  one.
+- **The agent knows the board** (the `genesis init` instructions and the `genesis_openBoard`
+  tool). It offers the link when it finishes a design document, and answers "where can I see
+  this?" with it.
+
+`genesis keys` stays the page of your global keys only, from any folder.
+
 ## Commands
 
 | Command | What it does |
@@ -63,6 +87,7 @@ system for cafes, with owner, waiter and guest roles. Start with the requirement
 | `genesis uninstall [--dry-run]` | Removes only what `install` recorded in `~/.genesis-set/installed.json`, including the MCP registrations. mind-set and your API key file stay. |
 | `genesis doctor` | Both versions (genesis-set and mind-set) and whether they are compatible, the skills of each package and the MCP server per agent, where the API key comes from and which key it is (its type prefix and last four characters, such as `sk_mbx_...9f3a`, never the whole key) and the API base. |
 | `genesis config [show \| set-key \| unset-key \| set-base <url> \| unset-base]` | The API key and API base in `~/.genesis-set/config.json` (mode 0600). `set-key` reads the key from stdin (hidden on a terminal), never from the command line. |
+| `genesis board [<folder>] [--no-open]` | Opens the board of the genesis project in `<folder>` (default: the current one): design flow, documents, interview, blueprint, project and global keys (see "The project board"). |
 | `genesis keys [--no-open]` | Opens the local key page in your browser: add, change, clear or delete the keys your agent uses. The link is new each time; the page closes after 15 idle minutes or on Ctrl+C. `--no-open` only prints the link. |
 | `genesis mcp` | Runs the MCP server on stdio from the package (for a registration by hand). |
 
@@ -89,6 +114,18 @@ itself is never sent. A repository source (`repo`) is passed through as it is. E
 comes back in the Genesis error shape `{ "error": { "code", "message", "details" } }`.
 
 ### Keys: the local key page
+
+Keys have a **scope**:
+- **project:** this genesis project only; the default for a key the agent requests inside a
+  project.
+- **global:** yours in every project, like the Genesis API key.
+
+Both scopes are stored in your home folder: the global ones in `~/.genesis-set/config.json`, a
+project's in `~/.genesis-set/projects/<project id>/keys.json`. Neither is ever stored in the
+project folder. A key is looked up in the project first, then globally.
+
+- **The board:** inside a project, the board's Keys tab shows both scopes.
+- **`genesis keys`:** shows the global ones.
 
 A coding agent keeps needing secrets: the Genesis API key, and provider keys (payment, mail,
 storage, AI) to run the generated services. The rule is that no value is ever typed into the chat.
