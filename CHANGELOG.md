@@ -3,6 +3,16 @@
 The package follows semantic versioning. Each release names the mind-set range it needs
 (`dependencies["@mindbricks/mind-set"]` in `package.json`).
 
+## 0.10.2 (pre-release)
+
+- **No admin console in a Genesis build.** The generated services no longer carry the `/admin`
+  console page, `/admin/bootsummary`, the log and elastic-log admin reads, the search-index
+  resync, the big-load run triggers or the super-admin password reset: each needed a grant
+  from the Mindbricks platform, which a Genesis build does not use, so they could only refuse.
+  `/admin/health` stays, and the stored-view `repair-all` route of the bff now opens to a
+  platform operator session only. The run-locally page (section 6) says how to do these jobs on
+  your own infrastructure: the service log, a restart or redeploy, migrations on your database.
+
 ## 0.10.1 (pre-release)
 
 - The README lists `genesis_buildDiagrams` among the MCP tools and describes the diagrams (what

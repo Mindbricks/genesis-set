@@ -258,6 +258,14 @@ Boot verdicts by dependency (nodejs):
 
 `/admin/health` carries the full, redacted detail but is gated; use the log if you cannot reach it.
 
+A Genesis build has no admin console and no admin-only operation routes: no `/admin` page, no
+`/admin/bootsummary`, no log or elastic-log reads over HTTP, no search-index resync, no big-load
+run trigger and no super-admin password reset. Those routes need a grant from the Mindbricks
+platform, which a Genesis build does not use. Do these jobs on your own infrastructure: read the
+service log, restart or redeploy to re-run the boot repair of the search index, run schema
+changes as migrations on your database, and reset a lost super-admin password in the auth
+service's database.
+
 ## 7. Dependencies that start late
 
 A cold start where the database is a second behind is normal; the service heals without a restart.
