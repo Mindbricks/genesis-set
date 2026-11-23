@@ -117,6 +117,21 @@ export function interviewSummary(text) {
   return { status, open, ledger };
 }
 
+/**
+ * The design system the project follows (design/DESIGN_SYSTEM.md, written by
+ * genesis_applyDesignSystem): `{ slug, name, appliedAt }`, or null without the file.
+ * A file written by hand (no marker) still counts, named by its first heading.
+ */
+export function designSystemOf(files) {
+  const f = files.get('DESIGN_SYSTEM');
+  if (!f) return null;
+  const text = readText(f.file) ?? '';
+  const m = /^<!-- genesis design system: ([a-z0-9-]+) \((.+?)\), applied (\d{4}-\d{2}-\d{2})/.exec(text);
+  if (m) return { slug: m[1], name: m[2], appliedAt: m[3] };
+  const h = /^#\s+(.+?)(?:\s+—\s+Style Reference)?\s*$/m.exec(text);
+  return { slug: null, name: h ? h[1] : 'DESIGN_SYSTEM.md', appliedAt: null };
+}
+
 /** The blueprint at the project root: a summary, or the parse error. */
 export function blueprintSummary(root) {
   const file = path.join(root, 'blueprint.json');
@@ -269,11 +284,13 @@ export async function boardState({ env = process.env, project }) {
   const state = {
     project: { id: project.id, name: project.name, root: project.root },
     flow: await flow(env, project.root, pipeline, files),
+    designSystem: designSystemOf(files),
+    frontend: frontendState(project.root),
     interview: interviewSummary(files.has('interview-record') ? readText(files.get('interview-record').file) : null),
     blueprint: bp ? { file: bp.file, name: bp.name ?? null, services: bp.services ?? [], error: bp.error ?? null, mtime: bp.mtime ?? null } : null,
     validation: v ? (({ problems, ...summary }) => summary)(v) : v,
     // A blueprint with no design document: the design was skipped, which the standard allows.
-    designSkipped: Boolean(bp) && files.size === 0,
+    designSkipped: Boolean(bp) && [...files.keys()].every((n) => n === 'DESIGN_SYSTEM'),
     keys,
   };
   if (bp && !bp.error) state.blueprint.modules = withProblemCounts(blueprintModules(bp.raw), v?.problems ?? []);
@@ -304,6 +321,46 @@ export async function blueprintModule(env, project, modulePath) {
     problems: problems.slice(0, 200).map((p) => ({ level: p.level, text: p.text })),
     problemCount: problems.length,
   };
+}
+
+/**
+ * The delivered frontend service of the project (`<codename>-frontend-service/` at the project
+ * root, with `docs/README.md`): its prompt docs in catalog order, the architect docs, and
+ * whether design/frontend-progress.md exists. Null when no frontend service was delivered.
+ */
+export function frontendState(root) {
+  let dirs = [];
+  try {
+    dirs = fs.readdirSync(root, { withFileTypes: true }).filter((d) => d.isDirectory() && /-frontend-service$/.test(d.name));
+  } catch {
+    return null;
+  }
+  const dir = dirs.map((d) => d.name).sort().find((n) => fs.existsSync(path.join(root, n, 'docs', 'README.md')));
+  if (!dir) return null;
+  const docsDir = path.join(root, dir, 'docs');
+  const titleOf = (file) => {
+    const m = /^#\s+(.+)$/m.exec((readText(file) ?? '').slice(0, 4000));
+    return m ? m[1].trim() : path.basename(file, '.md');
+  };
+  const docs = [{ path: 'README.md', title: 'Index (read first)', kind: 'index' }];
+  for (const n of fs.readdirSync(docsDir).filter((x) => /^\d{2,3}-[A-Za-z0-9._-]+\.md$/.test(x)).sort()) {
+    docs.push({ path: n, title: titleOf(path.join(docsDir, n)), kind: 'prompt' });
+  }
+  try {
+    for (const n of fs.readdirSync(path.join(docsDir, 'architect')).filter((x) => /^[A-Za-z0-9._-]+\.md$/.test(x)).sort()) {
+      docs.push({ path: `architect/${n}`, title: titleOf(path.join(docsDir, 'architect', n)), kind: 'architect' });
+    }
+  } catch {
+    // no architect documents
+  }
+  return { folder: dir, docs, progress: fs.existsSync(path.join(root, 'design', 'frontend-progress.md')) };
+}
+
+/** One frontend doc's text (a path frontendState listed), or null. */
+export function frontendDoc(project, rel) {
+  const fe = frontendState(project.root);
+  if (!fe || !fe.docs.some((d) => d.path === rel)) return null;
+  return readText(path.join(project.root, fe.folder, 'docs', ...rel.split('/')));
 }
 
 /** One design document's text, by name; null for a name that is not a document of this project. */

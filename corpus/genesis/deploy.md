@@ -5,10 +5,11 @@ deploy itself is run by the user, or by you on the user's behalf, with the user'
 the target. No deploy credential ever goes to Genesis, into the blueprint or into a project file.
 This page lists, per target, what Genesis writes and the commands that deploy it.
 
-> **Not deployable yet.** Builds are dry runs for now: the deploy files are generated and
-> counted (the job's `deployArtifacts`), but nothing is pushed to the user's repositories, so
-> there is nothing to deploy yet. Until pushing opens, say so, and do not write a target's files
-> by hand as if Genesis had generated them.
+> **Delivery first.** Builds are dry runs for now: nothing is pushed to the user's repositories.
+> `genesis_deliverService` brings the service with its `deploy/<target>/` files to this machine,
+> and the steps below work from that folder. Where delivery is turned off for the account
+> (`GENESIS_DELIVERY_NOT_ENABLED`) there is nothing to deploy yet: say so, and do not write a target's files by hand as
+> if Genesis had generated them.
 
 ## 1. Asking for the deploy files
 
@@ -55,7 +56,9 @@ it wins.
   (`AUTH_SERVICE_URL`, `SERVICE_<NAME>_URL`, ...) are blank on purpose: the deploy sets them.
   The compose file and the Railway variables already wire the services of the same build.
 - **Provider credentials** (payment, mail, storage, AI): the keys each service reads are listed
-  in its `.providers.secrets.env.example` (compose) or as shared variables (Railway). Missing ones
+  in its `.providers.secrets.env.example` (compose) or as shared variables (Railway). A key the
+  blueprint gives as `$ENV:NAME` is listed as `NAME`: the slot file carries the reference and the
+  service reads `NAME` at boot. Missing ones
   do not stop the service from starting; it answers errors where they are needed (see
   [pitfalls.md](pitfalls.md)).
   - **For a local file** (`.env`, `*.secrets.env`): ask for each key on the local key page

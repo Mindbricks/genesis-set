@@ -5,7 +5,9 @@ description: PRE-RELEASE. Compile a validated OpenAPPL blueprint into service co
 
 # Genesis Compiler API
 
-> **Builds are dry runs for now:** the code is generated and measured, nothing is pushed. When a
+> **Builds are dry runs for now:** the code is generated and measured, nothing is pushed.
+> `genesis_deliverService` brings a succeeded service build to this machine; delivery is open to
+> every Genesis account. When a
 > tool answers `GENESIS_UNREACHABLE`, say so plainly and stop: never claim a validation or a
 > build happened.
 
@@ -49,8 +51,11 @@ service build's result is `{{CORPUS}}/genesis/compile-results.md`.
    A failure is a blueprint fault (fix, validate, compile that service again) or a compiler fault
    (report it with the job id and the exact error).
 6. `genesis_getBuilds` finds earlier builds and their job ids (filter by `codename`).
-7. Start the run-and-test skill when the matching generated service repositories are available.
-   A successful dry run provides a report and inventory. It leaves no checkout or local deploy files.
+7. Deliver each succeeded service: `genesis_deliverService` with its jobId (first with
+   `dryRun: true` when the service folder already holds work, to show the user the plan). Then
+   start the run-and-test skill. If it answers `GENESIS_DELIVERY_NOT_ENABLED` (Genesis turned
+   delivery off for the account), a successful dry run provides a report and inventory only;
+   say so and stop there.
 
 ## Not available yet
 

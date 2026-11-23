@@ -13,9 +13,10 @@ Read `{{CORPUS}}/genesis/deploy.md` fully first. Each target folder also has a g
 `README.md` for that service and build: read it before you run anything; where it and the guide
 differ, it wins.
 
-Builds are dry runs for now: the deploy files are generated and counted but not pushed to the
-user's repositories, so there is nothing to deploy yet (deploy.md says so first). Tell the user;
-do not write the files by hand.
+Builds are dry runs for now: nothing is pushed to the user's repositories. Deploy from a service
+delivered with `genesis_deliverService` (the build must have asked for the target). Where
+delivery is turned off for the account (`GENESIS_DELIVERY_NOT_ENABLED`) there is nothing to deploy yet (deploy.md says so first):
+tell the user, and do not write the files by hand.
 
 ## Steps
 

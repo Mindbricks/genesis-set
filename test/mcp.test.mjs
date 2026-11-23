@@ -120,9 +120,12 @@ describe('MCP protocol', () => {
     assert.deepEqual(
       list.result.tools.map((t) => t.name).sort(),
       [
+        'genesis_applyDesignSystem',
         'genesis_buildService',
+        'genesis_deliverService',
         'genesis_getBuilds',
         'genesis_getServiceBuild',
+        'genesis_listDesignSystems',
         'genesis_listKeys',
         'genesis_openBoard',
         'genesis_openKeyManager',
@@ -251,6 +254,56 @@ describe('the tools and what they send', () => {
     assert.equal(j.data.job.status, 'running');
     assert.equal(requests[1].url, `${API}/jobs/j%2F1`);
     await s.close();
+  });
+
+  test('design systems: the list (theme filter is local), and apply writes design/DESIGN_SYSTEM.md of the project', async () => {
+    const rows = [
+      { slug: 'airy', name: 'Airy', tagline: 'light and calm', theme: 'light', summary: 's', similarBrands: [], colors: [], bytes: 10 },
+      { slug: 'nightowl', name: 'Night Owl', tagline: 'dark ops', theme: 'dark', summary: 's', similarBrands: [], colors: [], bytes: 12 },
+    ];
+    respond = (q) => {
+      if (q.url === `${API}/design-systems`) return [200, { designSystems: rows, count: 2, catalogVersion: 'abc123' }];
+      if (q.url === `${API}/design-systems/nightowl`) return [200, { designSystem: { ...rows[1], markdown: '# Night Owl \u2014 Style Reference\r\n\r\nTokens.\r\n' } }];
+      return [404, { error: { code: 'GENESIS_DESIGN_SYSTEM_NOT_FOUND', message: 'no such design system' } }];
+    };
+    const root = tempDir();
+    fs.mkdirSync(path.join(root, '.genesis'));
+    fs.writeFileSync(path.join(root, '.genesis', 'project.json'), JSON.stringify({ id: 'proj-1234abcd', name: 'shop' }));
+    const sub = path.join(root, 'web');
+    fs.mkdirSync(sub);
+    const s = await session({ env: { GENESIS_API_KEY: KEY }, cwd: sub });
+    const all = await call(s, 'genesis_listDesignSystems', {});
+    assert.equal(all.data.count, 2);
+    assert.equal(all.data.compact, true);
+    assert.deepEqual(Object.keys(all.data.designSystems[0]), ['slug', 'name', 'tagline', 'theme', 'similarBrands', 'colors'], 'the compact row');
+    const short = await call(s, 'genesis_listDesignSystems', { slugs: ['nightowl'] });
+    assert.equal(short.data.compact, false);
+    assert.equal(short.data.designSystems[0].summary, 's');
+    const dark = await call(s, 'genesis_listDesignSystems', { theme: 'dark' });
+    assert.deepEqual(dark.data.designSystems.map((d) => d.slug), ['nightowl']);
+    assert.equal(dark.data.count, 1);
+    assert.equal(requests[2].url, `${API}/design-systems`, 'the filter is not sent');
+
+    const applied = await call(s, 'genesis_applyDesignSystem', { slug: 'nightowl' });
+    assert.equal(applied.isError, false);
+    assert.equal(applied.data.applied.slug, 'nightowl');
+    const file = path.join(root, 'design', 'DESIGN_SYSTEM.md');
+    assert.equal(fs.realpathSync(applied.data.applied.file), fs.realpathSync(file));
+    const text = fs.readFileSync(file, 'utf8');
+    assert.match(text, /^<!-- genesis design system: nightowl \(Night Owl\), applied \d{4}-\d{2}-\d{2} by genesis_applyDesignSystem\./);
+    assert.ok(text.endsWith('# Night Owl \u2014 Style Reference\n\nTokens.\n'), 'the markdown follows the marker, with LF line ends');
+    assert.equal(JSON.stringify(applied.data).includes('Tokens.'), false, 'the text stays in the file');
+
+    const missing = await call(s, 'genesis_applyDesignSystem', { slug: 'nope' });
+    assert.equal(missing.data.error.code, 'GENESIS_DESIGN_SYSTEM_NOT_FOUND');
+    const bad = await call(s, 'genesis_applyDesignSystem', { slug: '../x' });
+    assert.equal(bad.data.error.code, 'GENESIS_BAD_ARGUMENTS');
+    await s.close();
+
+    const outside = await session({ env: { GENESIS_API_KEY: KEY }, cwd: tempDir() });
+    const none = await call(outside, 'genesis_applyDesignSystem', { slug: 'nightowl' });
+    assert.equal(none.data.error.code, 'GENESIS_NO_PROJECT');
+    await outside.close();
   });
 
   test('the repo source is passed through as given; the API answers that it is not available yet', async () => {
@@ -440,6 +493,6 @@ describe('closing stdin', () => {
     const answers = res.stdout.trim().split('\n').map((l) => JSON.parse(l));
     assert.equal(answers.length, 41);
     assert.ok(res.stdout.length > 256 * 1024, `the answers are large enough to fill a pipe (${res.stdout.length} bytes)`);
-    for (const a of answers.slice(1)) assert.equal(a.result.tools.length, 10);
+    for (const a of answers.slice(1)) assert.equal(a.result.tools.length, 13);
   });
 });

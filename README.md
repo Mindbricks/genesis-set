@@ -2,12 +2,14 @@
 
 > **PRE-RELEASE.** The Genesis Compiler API is open at `https://api.genesiscompiler.com`.
 > Builds are dry runs for now: the code is generated and measured, nothing is pushed yet.
+> `genesis_deliverService` brings a succeeded service build into your project folder; delivery is
+> open to every Genesis account.
 
 Skills that teach a coding agent (Claude Code, Codex) to use the **Genesis compiler** on an
 OpenAPPL blueprint: what the generated services do at run time, the Genesis steps next to the
 blueprint procedures, and the Genesis Compiler API (validate, build, follow a build). A local
-MCP server gives the agent the Compiler API as five `genesis_*` tools, plus four tools and a
-local page for the keys the agent needs.
+MCP server gives the agent the Compiler API as five `genesis_*` tools, two tools for the design
+system catalog the frontend follows, one that delivers a build to your machine, plus four tools and a local page for the keys the agent needs.
 
 genesis-set sits on [mind-set](https://github.com/Mindbricks/mind-set), the OpenAPPL layer.
 mind-set teaches designing and writing the blueprint; genesis-set adds what is specific to
@@ -87,7 +89,9 @@ The board's Mail tab reads that sink through Mailpit's API (`http://127.0.0.1:80
 `GENESIS_MAILPIT_URL` moves it). When none answers, it says how to start one.
 
 The board runs on `http://127.0.0.1:4747/` (the next free port if that one is taken;
-`GENESIS_BOARD_PORT` moves it) until it is idle for an hour or you press Ctrl+C.
+`GENESIS_BOARD_PORT` moves it) until it goes 30 minutes without use or you press Ctrl+C. The open
+page's own refresh does not count as use, so a board left open in a forgotten tab still closes; the
+page then says so, and `genesis board` opens it again.
 - **Bookmark it:** the plain address is read-only.
 - **Changing keys** takes the link `genesis board` opens, which sets a write cookie for that run.
 - **One board per project:** a second `genesis board` for the same project reuses the running
@@ -128,6 +132,32 @@ dependencies besides Node 18.
 | `genesis_buildService` | `POST /builds` with one service |
 | `genesis_getBuilds` | `GET /builds` |
 | `genesis_getServiceBuild` | `GET /jobs/:jobId` |
+| `genesis_listDesignSystems` | `GET /design-systems` |
+| `genesis_applyDesignSystem` | `GET /design-systems/:slug`, written to `design/DESIGN_SYSTEM.md` of the project |
+| `genesis_deliverService` | `GET /jobs/:jobId/archive`, downloaded (sha256 checked) and applied to `<project>/<codename>-<service>-service/` |
+
+**Delivery.** Until builds push to your repositories, a succeeded service build comes to your
+machine as an archive. Delivery is open to every Genesis account; `GENESIS_DELIVERY_NOT_ENABLED`
+answers only where Genesis turned it off for the account. `genesis_deliverService` applies it with
+the manifest rule:
+- the generated files are written;
+- generated files the build no longer makes are deleted (one you edited is kept and reported);
+- everything else is kept: your files, `service-files/` and `.git`.
+
+It runs no git command; you review and commit. `dryRun: true` shows the plan first. Archives are
+kept for 7 days.
+
+**Frontend.** The frontend service's prompt docs, once delivered, drive the frontend work: the
+`genesis-frontend` skill builds the app in that folder one step at a time with subagents, after
+the design system is picked. It records its progress in `design/frontend-progress.md`. The
+board's Frontend tab shows the prompt docs and that progress.
+
+**Design systems.** Genesis serves a catalog of style references for the frontend (tokens,
+components, imagery, do's and don'ts, an agent prompt guide). Before the first frontend work the
+agent proposes the five that fit `design/frontend-spec.md`, you pick one, and
+`genesis_applyDesignSystem` writes it to `design/DESIGN_SYSTEM.md`; every frontend brief follows
+that file (the `genesis-design-system` skill). The board shows the choice on its Overview. The
+systems describe the look of known products: the product takes the look, never the brand.
 
 A blueprint path is read on your machine, checked against the size limit (10 MiB of compact
 JSON; `GENESIS_MAX_BLUEPRINT_BYTES` when your API says otherwise) and sent inline; the path

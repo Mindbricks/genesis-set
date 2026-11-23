@@ -3,6 +3,44 @@
 The package follows semantic versioning. Each release names the mind-set range it needs
 (`dependencies["@mindbricks/mind-set"]` in `package.json`).
 
+## 0.9.0 (pre-release)
+
+- **Delivery: a succeeded build comes to this machine.** `genesis_deliverService` downloads a
+  service job's generated tree (`GET /jobs/:jobId/archive`, a short-lived link, sha256
+  checked) and applies it to `<project>/<codename>-<service>-service/` with the manifest rule:
+  - generated files are written; generated files no longer made are deleted (an edited one is
+    kept and reported);
+  - your files, `service-files/` and `.git` are kept;
+  - no git command runs; `dryRun: true` shows the plan.
+  Delivery is open to every Genesis account. Where Genesis turns it off for an account, the
+  tool answers `GENESIS_DELIVERY_NOT_ENABLED`.
+- **The `genesis-frontend` skill:** after the design system is picked, the frontend is built
+  from the delivered frontend service's prompt docs, one step at a time with subagents, and the
+  progress is kept in `design/frontend-progress.md`.
+- **The board's Frontend tab:** the prompt docs in catalog order, the architect docs and the
+  progress.
+- The Compiler API corpus page, the compiler-api and deploy skills, and the `genesis init`
+  instructions describe delivery.
+
+## 0.8.0 (pre-release)
+
+- **Design systems for the frontend.** Genesis serves a catalog of style references (tokens,
+  components, imagery, do's and don'ts, an agent prompt guide), and two new tools reach it:
+  `genesis_listDesignSystems` (`GET /design-systems`) and `genesis_applyDesignSystem`
+  (`GET /design-systems/:slug`, written to `design/DESIGN_SYSTEM.md` of the project).
+  - The new skill `genesis-design-system`: before the first frontend work the agent proposes the
+    five systems that fit the frontend spec, the user picks one, and every frontend brief
+    follows `design/DESIGN_SYSTEM.md`. The product takes the look, never the brand.
+  - The board shows the chosen system on its Overview and the file under Documents.
+  - The `genesis init` instructions name the step.
+
+## 0.7.1 (pre-release)
+
+- **The board closes after 30 minutes without use** (was an hour without a request). The open page
+  refreshes every 3 seconds; that refresh no longer keeps the board alive, only use does (a page
+  load, a click, a key, a scroll, a tab change). A closed board's page says so and how to open it
+  again (`genesis board`).
+
 ## 0.7.0 (pre-release)
 
 - **The board's Blueprint tab shows every module of the blueprint.** A list on the left holds the

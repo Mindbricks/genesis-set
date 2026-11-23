@@ -107,7 +107,7 @@ const SCRIPT = `
 (() => {
   const main = document.getElementById('main');
   const flash = document.getElementById('flash');
-  const TABS = ['overview', 'documents', 'interview', 'blueprint', 'mail', 'keys'];
+  const TABS = ['overview', 'documents', 'interview', 'blueprint', 'frontend', 'mail', 'keys'];
   let state = null, shown = '', docCache = new Map(), moduleCache = new Map(), afterRender = null;
 
   function el(tag, cls, text) {
@@ -126,8 +126,9 @@ const SCRIPT = `
     const [tab, ...rest] = h.split('/');
     return { tab: TABS.includes(tab) ? tab : 'overview', arg: decodeURIComponent(rest.join('/')) };
   }
-  async function api(method, url, body) {
-    const res = await fetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, cache: 'no-store' });
+  async function api(method, url, body, extra) {
+    const hdrs = Object.assign(body ? { 'Content-Type': 'application/json' } : {}, extra || {});
+    const res = await fetch(url, { method, headers: hdrs, body: body ? JSON.stringify(body) : undefined, cache: 'no-store' });
     let data = {}; try { data = await res.json(); } catch {}
     if (!res.ok) throw new Error((data.error && data.error.message) || ('the board answered ' + res.status));
     return data;
@@ -157,7 +158,7 @@ const SCRIPT = `
     card.append(el('div', 'small muted', 'The design documents are strongly recommended for the quality of the blueprint (the spec-driven method of mind-set). They are not part of the OpenAPPL standard, which requires only the blueprint.'));
     if (state.designSkipped) {
       card.append(el('p', 'note', 'No design documents: the blueprint was written directly, so its requirements were never settled in writing. Follow it on the Blueprint tab.'));
-      frag.append(card);
+      frag.append(card, designSystemCard());
       return frag;
     }
     if (!f.available) { card.append(el('p', 'muted', 'The design pipeline is not installed. Run "genesis install".')); frag.append(card); return frag; }
@@ -175,13 +176,31 @@ const SCRIPT = `
       }
       card.append(box);
     }
-    if (f.other && f.other.length) {
+    const others = (f.other || []).filter((n) => n !== 'DESIGN_SYSTEM');
+    if (others.length) {
       const box = el('div', 'stage'); box.append(el('h3', '', 'Other documents'));
-      for (const n of f.other) { const r = el('div', 'row link'); r.append(el('span', 'doc grow', n)); r.addEventListener('click', () => { location.hash = '#documents/' + encodeURIComponent(n); }); box.append(r); }
+      for (const n of others) { const r = el('div', 'row link'); r.append(el('span', 'doc grow', n)); r.addEventListener('click', () => { location.hash = '#documents/' + encodeURIComponent(n); }); box.append(r); }
       card.append(box);
     }
     frag.append(card);
+    frag.append(designSystemCard());
     return frag;
+  }
+
+  function designSystemCard() {
+    const card = el('section', 'card');
+    card.append(el('h2', '', 'Design system'));
+    const ds = state.designSystem;
+    if (!ds) {
+      card.append(el('p', 'muted', 'None chosen yet. Before the frontend work the agent proposes five from the Genesis catalog that fit the frontend spec, and you pick one.'));
+      return card;
+    }
+    const r = el('div', 'row link');
+    r.append(el('span', 'grow', ds.name), el('span', 'small muted', ds.slug ? ds.slug + (ds.appliedAt ? ' · applied ' + ds.appliedAt : '') : 'written by hand'));
+    r.addEventListener('click', () => { location.hash = '#documents/DESIGN_SYSTEM'; });
+    card.append(r);
+    card.append(el('p', 'small muted', 'The frontend work follows design/DESIGN_SYSTEM.md. To change it, ask the agent for another one.'));
+    return card;
   }
 
   async function documents(arg) {
@@ -201,6 +220,37 @@ const SCRIPT = `
     try {
       if (!docCache.has(key)) docCache.set(key, (await api('GET', '/api/doc?name=' + encodeURIComponent(pick))).html);
       body.innerHTML = docCache.get(key); // the server's escaped rendering (board-md.mjs)
+    } catch (e) { body.textContent = e.message; }
+    return wrap;
+  }
+
+  async function frontend(arg) {
+    const fe = state.frontend;
+    if (!fe) {
+      const card = el('section', 'card'); card.append(el('h2', '', 'Frontend'));
+      card.append(el('p', 'muted', 'No frontend service on this machine yet. The agent compiles the frontend service and delivers it into the project folder; its prompt docs then show here, with the progress of the frontend work.'));
+      return card;
+    }
+    const wrap = el('div', 'split');
+    const list = el('section', 'card list tree');
+    const items = (fe.progress ? [{ path: '@progress', title: 'Progress', kind: 'progress' }] : []).concat(fe.docs);
+    const pick = items.some((d) => d.path === arg) ? arg : items[0].path;
+    let kind = null;
+    for (const d of items) {
+      const label = d.kind === 'prompt' ? 'Prompt docs' : d.kind === 'architect' ? 'Architect docs' : d.kind === 'progress' ? 'Frontend work' : 'Catalog';
+      if (label !== kind) { kind = label; list.append(el('div', 'group', label)); }
+      const r = el('div', 'row link' + (d.path === pick ? ' on' : ''), d.kind === 'prompt' ? d.path.replace(/\.md$/, '') : d.title);
+      r.title = d.title;
+      r.addEventListener('click', () => { window.scrollTo(0, 0); location.hash = '#frontend/' + encodeURIComponent(d.path); });
+      list.append(r);
+    }
+    const view = el('section', 'card md');
+    view.append(el('div', 'small muted', fe.folder));
+    const body = el('div', '', 'Loading...'); view.append(body);
+    wrap.append(list, view);
+    try {
+      const url = pick === '@progress' ? '/api/doc?name=frontend-progress' : '/api/frontend-doc?path=' + encodeURIComponent(pick);
+      body.innerHTML = (await api('GET', url)).html; // the server's escaped rendering (board-md.mjs)
     } catch (e) { body.textContent = e.message; }
     return wrap;
   }
@@ -451,25 +501,39 @@ const SCRIPT = `
     if (sig === shown && !force) return;
     if (!force && tab === 'keys' && typing()) return;
     shown = sig;
-    const content = tab === 'overview' ? overview() : tab === 'documents' ? await documents(arg) : tab === 'interview' ? interview() : tab === 'blueprint' ? await blueprint(arg) : tab === 'mail' ? await mail(arg) : keys();
+    const content = tab === 'overview' ? overview() : tab === 'documents' ? await documents(arg) : tab === 'interview' ? interview() : tab === 'blueprint' ? await blueprint(arg) : tab === 'frontend' ? await frontend(arg) : tab === 'mail' ? await mail(arg) : keys();
     main.replaceChildren(content);
     // A view that needs its own layout settled (the blueprint list scroll) runs after it is in the page.
     if (afterRender) { const f = afterRender; afterRender = null; f(); }
   }
 
-  async function load(force) {
-    try { state = await api('GET', '/api/state'); await render(force); }
-    catch (e) { say(e.message, 'err'); }
+  // The board closes after its idle limit without USE. The 3-second poll says whether the user did
+  // anything since the last one; an idle poll does not keep the board open.
+  let used = true, closed = false, timer = null;
+  for (const ev of ['pointerdown', 'keydown', 'wheel', 'touchstart', 'hashchange']) window.addEventListener(ev, () => { used = true; }, { passive: true });
+  function showClosed() {
+    closed = true; clearInterval(timer);
+    const card = el('section', 'card next');
+    card.append(el('b', '', 'Board closed'));
+    card.append(el('p', '', 'This board closed after ' + IDLE_MINUTES + ' minutes without use. Run genesis board in the project folder to open it again.'));
+    main.replaceChildren(card);
+  }
+  async function load(force, poll) {
+    if (closed) return;
+    const mark = poll ? { 'X-Board-Poll': used ? 'active' : 'idle' } : null;
+    if (poll) used = false;
+    try { state = await api('GET', '/api/state', undefined, mark); await render(force); }
+    catch (e) { if (e instanceof TypeError) showClosed(); else say(e.message, 'err'); }
   }
 
   window.addEventListener('hashchange', () => render(true));
-  setInterval(() => { if (document.visibilityState === 'visible') load(false); }, 3000);
+  timer = setInterval(() => { if (document.visibilityState === 'visible') load(false, true); }, 3000);
   load(true);
 })();
 `;
 
 /** The board page; the project name is set as text by the script's first state load. */
-export function renderBoardPage({ nonce, projectName }) {
+export function renderBoardPage({ nonce, projectName, idleMinutes = 30 }) {
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   return (
     '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
@@ -480,11 +544,11 @@ export function renderBoardPage({ nonce, projectName }) {
     '<body><header><div class="bar">' +
     `<div class="title"><h1>${esc(projectName)}</h1><span class="sub">Genesis project board</span></div>` +
     '<nav><a href="#overview" data-tab="overview">Overview</a><a href="#documents" data-tab="documents">Documents</a>' +
-    '<a href="#interview" data-tab="interview">Interview</a><a href="#blueprint" data-tab="blueprint">Blueprint</a>' +
+    '<a href="#interview" data-tab="interview">Interview</a><a href="#blueprint" data-tab="blueprint">Blueprint</a><a href="#frontend" data-tab="frontend">Frontend</a>' +
     '<a href="#mail" data-tab="mail">Mail</a><a href="#keys" data-tab="keys">Keys</a></nav></div></header>' +
     '<main id="main"></main>' +
-    '<div class="bar"><footer>Local board on 127.0.0.1, read from the project folder as the agent writes. Open it any time with <code>genesis board</code> in the project folder.</footer></div>' +
+    `<div class="bar"><footer>Local board on 127.0.0.1, read from the project folder as the agent writes. It closes after ${Number(idleMinutes)} minutes without use; open it any time with <code>genesis board</code> in the project folder.</footer></div>` +
     '<div id="flash" role="status" aria-live="polite"></div>' +
-    `<script nonce="${nonce}">${SCRIPT}</script></body></html>`
+    `<script nonce="${nonce}">const IDLE_MINUTES = ${Number(idleMinutes)};${SCRIPT}</script></body></html>`
   );
 }

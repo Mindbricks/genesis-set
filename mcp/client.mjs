@@ -139,3 +139,61 @@ function anySignal(signals) {
   }
   return ctl.signal;
 }
+
+/**
+ * Downloads a build archive. `auth: "bearer"` means `url` is a path below the
+ * Genesis API base and the API key goes with it; `auth: "none"` means `url` is
+ * a presigned link (https, or http to localhost) that takes no credential, so
+ * the key is never sent there. Answers `{ ok: true, bytes }` or a local failure.
+ */
+export async function downloadGenesis(settings, url, { auth, maxBytes, signal } = {}) {
+  let target;
+  const headers = { 'user-agent': settings.userAgent ?? 'genesis-set-mcp' };
+  if (auth === 'bearer') {
+    if (!settings.apiKey) return localFailure('GENESIS_API_KEY_MISSING', missingKeyMessage(settings.configFile, settings.apiBase));
+    if (typeof url !== 'string' || !url.startsWith('/')) return localFailure('GENESIS_BAD_RESPONSE', 'The archive link is not a path below the API base');
+    target = new URL(`${settings.apiBase}${API_PATH}${url}`);
+    headers.authorization = `Bearer ${settings.apiKey}`;
+  } else if (auth === 'none') {
+    try {
+      target = new URL(url);
+    } catch {
+      return localFailure('GENESIS_BAD_RESPONSE', 'The archive link is not a URL');
+    }
+    const local = ['127.0.0.1', 'localhost', '[::1]'].includes(target.hostname);
+    if (target.protocol !== 'https:' && !(target.protocol === 'http:' && local)) {
+      return localFailure('GENESIS_BAD_RESPONSE', 'The archive link is not https; nothing was downloaded');
+    }
+  } else {
+    return localFailure('GENESIS_BAD_RESPONSE', `Unknown archive link auth "${auth}"`);
+  }
+  const signals = [AbortSignal.timeout(Math.max(settings.timeoutMs ?? 0, 300000))];
+  if (signal) signals.push(signal);
+  let res;
+  try {
+    res = await fetch(target, { headers, signal: signals.length === 1 ? signals[0] : anySignal(signals), redirect: 'error' });
+  } catch (err) {
+    return localFailure('GENESIS_UNREACHABLE', `The archive could not be downloaded (${networkCode(err) ?? err?.message ?? 'network error'})`);
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      json = undefined;
+    }
+    if (isGenesisErrorBody(json)) return { ok: false, httpStatus: res.status, body: json };
+    return { ok: false, httpStatus: res.status, body: genesisError('GENESIS_ARCHIVE_DOWNLOAD_FAILED', `The archive download answered ${res.status}`) };
+  }
+  const declared = Number(res.headers.get('content-length') ?? 0);
+  if (maxBytes && declared > maxBytes) return localFailure('GENESIS_ARCHIVE_TOO_LARGE', `The archive is ${declared} bytes, over the ${maxBytes} limit`);
+  const chunks = [];
+  let total = 0;
+  for await (const chunk of res.body) {
+    total += chunk.length;
+    if (maxBytes && total > maxBytes) return localFailure('GENESIS_ARCHIVE_TOO_LARGE', `The archive is over the ${maxBytes} byte limit`);
+    chunks.push(Buffer.from(chunk));
+  }
+  return { ok: true, bytes: Buffer.concat(chunks) };
+}

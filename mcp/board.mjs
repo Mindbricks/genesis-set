@@ -22,7 +22,7 @@ import http from 'node:http';
 import path from 'node:path';
 
 import { dataDirOf } from './config.mjs';
-import { blueprintModule, boardState, designDoc } from './board-data.mjs';
+import { blueprintModule, boardState, designDoc, frontendDoc } from './board-data.mjs';
 import { renderBoardPage } from './board-html.mjs';
 import { renderMarkdown } from './board-md.mjs';
 import { KeyStoreError, SCOPES, clearKeyValue, deleteKey, requestKey, setKeyValue } from './key-store.mjs';
@@ -30,7 +30,10 @@ import { clearMail, listMail, readMail } from './mail-view.mjs';
 
 export const BOARD_PORT = 4747;
 const PORT_TRIES = 20;
-export const BOARD_IDLE_MS = 60 * 60 * 1000;
+// Closes after this long without USE: a page load, a click or key press, a tab change. The open
+// page polls the state every 3 s; a poll marked idle by the page keeps nothing alive, so a board
+// left open in a forgotten tab still closes.
+export const BOARD_IDLE_MS = 30 * 60 * 1000;
 const MAX_BODY = 32 * 1024;
 
 let current = null; // { server, port, token, project, env, idleMs, timer, tokenFile, closed, resolveClosed }
@@ -116,8 +119,9 @@ async function handle(board, req, res) {
   if (!hosts.has(String(req.headers.host ?? '').toLowerCase())) {
     return sendError(res, 421, 'GENESIS_BOARD_HOST', 'the board answers only on its own local address');
   }
-  touch(board);
   const url = new URL(req.url ?? '/', `http://127.0.0.1:${board.port}`);
+  const idlePoll = req.method === 'GET' && url.pathname === '/api/state' && req.headers['x-board-poll'] === 'idle';
+  if (!idlePoll) touch(board);
   const canWrite = sameToken(cookieOf(req, board.port), board.token);
 
   if (req.method === 'GET' && url.pathname === '/') {
@@ -133,7 +137,7 @@ async function handle(board, req, res) {
     }
     res.statusCode = 200;
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    return res.end(renderBoardPage({ nonce, projectName: board.project.name }));
+    return res.end(renderBoardPage({ nonce, projectName: board.project.name, idleMinutes: Math.round(board.idleMs / 60000) }));
   }
 
   if (req.method === 'GET' && url.pathname === '/api/whoami') {
@@ -164,6 +168,12 @@ async function handle(board, req, res) {
     const m = await blueprintModule(board.env, board.project, url.searchParams.get('path') ?? '$');
     if (!m) return sendError(res, 404, 'GENESIS_BOARD_NO_MODULE', 'no such part of blueprint.json');
     return sendJson(res, 200, { module: m });
+  }
+  if (req.method === 'GET' && url.pathname === '/api/frontend-doc') {
+    const rel = url.searchParams.get('path') ?? '';
+    const text = frontendDoc(board.project, rel);
+    if (text === null) return sendError(res, 404, 'GENESIS_BOARD_NO_DOC', 'no such frontend document');
+    return sendJson(res, 200, { path: rel, html: renderMarkdown(text) });
   }
   if (req.method === 'GET' && url.pathname === '/api/doc') {
     const name = url.searchParams.get('name') ?? '';

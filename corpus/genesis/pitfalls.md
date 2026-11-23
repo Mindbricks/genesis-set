@@ -129,6 +129,14 @@ Rules:
 - A required key that is NOT a secret (a sender address on your own domain) takes the real
   value, never the placeholder: a placeholder there reads as a value and the provider fails at
   send time with nothing warning first.
+- A secret the blueprint gives as `$ENV:NAME` is written into every slot file as a plain
+  `<KEY>=$ENV:NAME` line, for every provider family (payment, AI, storage, video, invoice,
+  fiscal, graph, big data, notification). At boot the service replaces it with the value of
+  `NAME`, so set `NAME` in the service's secrets file or deployment, not `<KEY>`. With `NAME`
+  unset the key reads as missing and the fallback above applies; a self, nested or misspelt
+  reference (`$env:X`, `$ENV: X`) reads as missing too and is named in the boot log. A service
+  in another language does not follow the reference yet (validation warns,
+  `PROVIDER_ENV_REFERENCE_RUNTIME_UNSUPPORTED`).
 - `<PREFIX>_CREDENTIAL_MODE` in a slot's environment (`auto`, `sandbox`, `live`, `mock`) is
   read BEFORE the credential check: `mock` engages the mock or sink whatever credentials are
   present; `live` lifts the payment live-key guard on a non-prod slot. Unrecognised or blank

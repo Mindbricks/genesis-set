@@ -15,9 +15,9 @@ import path from 'node:path';
 import { after, afterEach, describe, test } from 'node:test';
 
 import { blueprintModules, hideSecrets, isUnder, nameOf, valueAt } from '../mcp/board-blueprint.mjs';
-import { blueprintModule, boardState, designDoc, interviewSummary } from '../mcp/board-data.mjs';
+import { blueprintModule, boardState, designDoc, frontendDoc, frontendState, interviewSummary } from '../mcp/board-data.mjs';
 import { renderMarkdown } from '../mcp/board-md.mjs';
-import { closeBoard, ensureBoard } from '../mcp/board.mjs';
+import { boardClosed, closeBoard, ensureBoard } from '../mcp/board.mjs';
 import { keyValue } from '../mcp/key-store.mjs';
 import { ensureProject, projectKeysFile } from '../mcp/project.mjs';
 import { PKG_DIR, cleanup, tempDir } from './helpers.mjs';
@@ -147,6 +147,46 @@ describe('the board data', () => {
     assert.match(state.validation.first[0], /serviceSettings is required/);
     const broken = await boardState({ env, project: project({ 'blueprint.json': '{ not json' }) });
     assert.match(broken.blueprint.error, /not valid JSON/);
+  });
+
+  test('the design system the project follows: from the applied file, from a hand-written one, or none', async () => {
+    const env = envFor(fakeMindSet());
+    const none = await boardState({ env, project: project({}) });
+    assert.equal(none.designSystem, null);
+    const applied = await boardState({ env, project: project({ 'design/DESIGN_SYSTEM.md': '<!-- genesis design system: nightowl (Night Owl), applied 2026-11-22 by genesis_applyDesignSystem. -->\n\n# Night Owl \u2014 Style Reference\n' }) });
+    assert.deepEqual(applied.designSystem, { slug: 'nightowl', name: 'Night Owl', appliedAt: '2026-11-22' });
+    assert.ok(applied.flow.other.includes('DESIGN_SYSTEM'), 'it is listed among the documents');
+    const byHand = await boardState({ env, project: project({ 'design/DESIGN_SYSTEM.md': '# Our look\n' }) });
+    assert.deepEqual(byHand.designSystem, { slug: null, name: 'Our look', appliedAt: null });
+    // A design system alone does not make the design flow "started": a blueprint-first project stays skipped.
+    const bpOnly = await boardState({ env, project: project({ 'blueprint.json': JSON.stringify({ services: [] }), 'design/DESIGN_SYSTEM.md': '# Our look\n' }) });
+    assert.equal(bpOnly.designSkipped, true);
+  });
+
+  test('the delivered frontend service: its prompt docs in catalog order, the architect docs and the progress file', async () => {
+    const env = envFor(fakeMindSet());
+    assert.equal((await boardState({ env, project: project({}) })).frontend, null);
+    const p = project({
+      'shop-frontend-service/docs/README.md': '# Frontend prompt docs\n',
+      'shop-frontend-service/docs/01-authentication.md': '# Authentication\n',
+      'shop-frontend-service/docs/00-project-overview.md': '# Project overview\n',
+      'shop-frontend-service/docs/notes.txt': 'x',
+      'shop-frontend-service/docs/architect/frontend-spec.md': '# Frontend spec\n',
+      'design/frontend-progress.md': '# Frontend progress\n',
+    });
+    const fe = (await boardState({ env, project: p })).frontend;
+    assert.equal(fe.folder, 'shop-frontend-service');
+    assert.equal(fe.progress, true);
+    assert.deepEqual(fe.docs.map((d) => [d.path, d.title, d.kind]), [
+      ['README.md', 'Index (read first)', 'index'],
+      ['00-project-overview.md', 'Project overview', 'prompt'],
+      ['01-authentication.md', 'Authentication', 'prompt'],
+      ['architect/frontend-spec.md', 'Frontend spec', 'architect'],
+    ]);
+    assert.equal(frontendDoc(p, '01-authentication.md'), '# Authentication\n');
+    assert.equal(frontendDoc(p, '../../design/frontend-progress.md'), null);
+    assert.equal(frontendDoc(p, 'notes.txt'), null);
+    assert.equal(frontendState(p.root).docs.length, 4);
   });
 
   test('a blueprint written without design documents: the design counts as skipped, the next step follows the blueprint', async () => {
@@ -282,6 +322,33 @@ function req(port, { method = 'GET', pathName = '/', headers = {}, body } = {}) 
 
 describe('the board server', () => {
   afterEach(() => closeBoard());
+
+  test('closes after its idle limit without use: the page polls marked idle keep nothing alive, a used page does', async () => {
+    const env = envFor(fakeMindSet());
+    const p = project();
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const pollUntil = async (port, mark, ms) => {
+      const end = Date.now() + ms;
+      while (Date.now() < end) {
+        try { await req(port, { pathName: '/api/state', headers: { 'x-board-poll': mark } }); } catch { return; }
+        await wait(60);
+      }
+    };
+    let b = await ensureBoard({ env, project: p, idleMs: 400 });
+    assert.equal(b.idleMinutes, 0);
+    let closedSeen = false;
+    boardClosed().then(() => { closedSeen = true; });
+    await pollUntil(b.port, 'active', 900);
+    assert.equal(closedSeen, false, 'a used page keeps the board open');
+    await pollUntil(b.port, 'idle', 900);
+    assert.equal(closedSeen, true, 'idle polls let it close');
+
+    b = await ensureBoard({ env, project: p });
+    assert.equal(b.idleMinutes, 30);
+    const page = await req(b.port);
+    assert.match(page.text, /const IDLE_MINUTES = 30;/);
+    assert.match(page.text, /closes after 30 minutes without use/);
+  });
 
   test('reads without a token; writes keys only with the write cookie and its own Origin; its own Host only', async () => {
     const env = envFor(fakeMindSet());

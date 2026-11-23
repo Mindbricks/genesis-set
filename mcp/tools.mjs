@@ -5,6 +5,9 @@
 //   genesis_buildService         POST /builds (exactly one service)
 //   genesis_getBuilds            GET  /builds
 //   genesis_getServiceBuild      GET  /jobs/:jobId
+//   genesis_listDesignSystems    GET  /design-systems
+//   genesis_applyDesignSystem    GET  /design-systems/:slug, written to design/DESIGN_SYSTEM.md
+//   genesis_deliverService       GET  /jobs/:jobId/archive, downloaded and applied to the local service folder
 //
 // and the local key tools of ./key-tools.mjs (genesis_requestKey,
 // genesis_listKeys, genesis_openKeyManager, genesis_writeKeyToEnvFile), which
@@ -14,12 +17,25 @@
 // repository source passed through as given) and the parameters its schema
 // names, nothing else: unknown arguments are refused before any call.
 
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 
 import { readLocalJson, LocalBlueprintError } from './blueprint.mjs';
-import { callGenesis, genesisError } from './client.mjs';
+import { callGenesis, downloadGenesis, genesisError } from './client.mjs';
+import { applyDelivery, planDelivery, planSummary } from './deliver.mjs';
+import { ArchiveError, readTarGz } from './tar-read.mjs';
+
+/** The largest archive genesis_deliverService downloads (gzip bytes). */
+const MAX_ARCHIVE_BYTES = 300 * 1024 * 1024;
 import { missingKeyMessage } from './config.mjs';
 import { KEY_TOOLS, isKeyTool, runKeyTool } from './key-tools.mjs';
+import { findProject } from './project.mjs';
+
+/** The file the chosen design system is written to, and the marker line it starts with. */
+export const DESIGN_SYSTEM_FILE = path.join('design', 'DESIGN_SYSTEM.md');
+export const DESIGN_SYSTEM_MARKER = '<!-- genesis design system:';
+const SLUG = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
 const REPO_SOURCE = {
   type: 'object',
@@ -146,6 +162,58 @@ const API_TOOLS = [
     },
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
+  {
+    name: 'genesis_listDesignSystems',
+    title: 'List the design systems',
+    description:
+      'The design system catalog of Genesis (GET /design-systems), compact: per system its slug, name, tagline, theme (light, dark or mixed), similar brands and two key colors. ' +
+      'Pass slugs (your shortlist) for those systems with their summary and four colors; full: true gives every system in full (large). ' +
+      'Use it before frontend work: propose the five that fit design/frontend-spec.md best, one reason each, and let the user pick (the genesis-design-system skill).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        theme: { type: 'string', enum: ['light', 'dark', 'mixed'], description: 'Only systems of this theme.' },
+        slugs: { type: 'array', description: 'Only these systems, each with its summary and key colors.' },
+        full: { type: 'boolean', description: 'Every field of every listed system (about 30k tokens for the whole catalog).' },
+      },
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: 'genesis_applyDesignSystem',
+    title: 'Apply a design system to the project',
+    description:
+      'Fetch one design system (GET /design-systems/:slug) and write it to design/DESIGN_SYSTEM.md of the current genesis project, replacing the one there. ' +
+      'Only after the user picked it. Frontend work then follows that file. Answers the file written; the text itself stays in the file.',
+    inputSchema: {
+      type: 'object',
+      properties: { slug: { type: 'string', description: 'The slug genesis_listDesignSystems gave.' } },
+      required: ['slug'],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  },
+  {
+    name: 'genesis_deliverService',
+    title: 'Deliver a service build to this machine',
+    description:
+      'Download the generated tree of one succeeded service build (GET /jobs/:jobId/archive) and apply it to the local service folder with the manifest rule: ' +
+      'generated files are written, generated files the build no longer makes are deleted, every other file (yours, service-files/, .git) is kept. No git command runs; the user reviews and commits. ' +
+      'Default folder: <project root>/<the service repo name>. dryRun: true reports the same plan and writes nothing. ' +
+      'The answer lists the files deleted and any edit of a generated file that was overwritten. Delivery is open to every Genesis account; where Genesis turned it off for the account (GENESIS_DELIVERY_NOT_ENABLED) the build stays a dry run.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        jobId: { type: 'string', description: 'The jobId of a succeeded service build (genesis_buildService, genesis_getBuilds).' },
+        target: { type: 'string', description: 'The service folder to apply it to (default: <project root>/<service repo name>).' },
+        dryRun: { type: 'boolean', description: 'Report the plan only; write nothing.' },
+      },
+      required: ['jobId'],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  },
 ];
 
 export const TOOLS = [...API_TOOLS, ...KEY_TOOLS];
@@ -233,6 +301,91 @@ const HANDLERS = {
   },
   async genesis_getServiceBuild(args, settings, signal) {
     return callGenesis(settings, `/jobs/${encodeURIComponent(args.jobId)}`, { signal });
+  },
+  async genesis_listDesignSystems(args, settings, signal) {
+    const res = await callGenesis(settings, '/design-systems', { signal });
+    if (!res.ok || !Array.isArray(res.body?.designSystems)) return res;
+    let rows = res.body.designSystems;
+    if (args.theme) rows = rows.filter((d) => d.theme === args.theme);
+    if (args.slugs) rows = rows.filter((d) => args.slugs.includes(d.slug));
+    const detailed = args.full === true || Boolean(args.slugs);
+    const designSystems = detailed
+      ? rows
+      : rows.map((d) => ({
+          slug: d.slug,
+          name: d.name,
+          tagline: d.tagline,
+          theme: d.theme,
+          similarBrands: d.similarBrands,
+          colors: Array.isArray(d.colors) ? d.colors.slice(0, 2).map((c) => c.value) : [],
+        }));
+    return { ...res, body: { ...res.body, designSystems, count: designSystems.length, compact: !detailed } };
+  },
+  async genesis_deliverService(args, settings, signal) {
+    const fail = (code, message, details) => ({ ok: false, httpStatus: null, body: genesisError(code, message, details) });
+    const link = await callGenesis(settings, `/jobs/${encodeURIComponent(args.jobId)}/archive`, { signal });
+    if (!link.ok) return link;
+    const a = link.body?.archive;
+    if (!a || typeof a.url !== 'string' || !/^[0-9a-f]{64}$/.test(String(a.sha256 ?? '')) || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/.test(String(a.root ?? ''))) {
+      return fail('GENESIS_BAD_RESPONSE', 'The archive answer is missing its link, sha256 or service folder name');
+    }
+    const cwd = settings.cwd ?? process.cwd();
+    const base = findProject(cwd)?.root ?? cwd;
+    const target = args.target ? path.resolve(cwd, args.target) : path.join(base, a.root);
+    if (fs.existsSync(target) && !fs.statSync(target).isDirectory()) return fail('GENESIS_BAD_ARGUMENTS', `${target} is not a folder`);
+    const dl = await downloadGenesis(settings, a.url, { auth: a.auth, maxBytes: MAX_ARCHIVE_BYTES, signal });
+    if (!dl.ok) return dl;
+    const sha = createHash('sha256').update(dl.bytes).digest('hex');
+    if (sha !== a.sha256) return fail('GENESIS_ARCHIVE_CORRUPT', 'The downloaded archive does not match its sha256; nothing was written. Try again.');
+    let read;
+    let plan;
+    try {
+      read = readTarGz(dl.bytes);
+      plan = planDelivery(read.entries, target);
+    } catch (e) {
+      if (e instanceof ArchiveError) return fail('GENESIS_ARCHIVE_INVALID', `${e.message}; nothing was written.`);
+      throw e;
+    }
+    if (!args.dryRun) {
+      try {
+        applyDelivery(plan, target);
+      } catch (e) {
+        return fail('GENESIS_DELIVERY_FAILED', `Writing into ${target} failed part way: ${e.message}. Re-run the delivery after fixing the cause; it is safe to repeat.`);
+      }
+    }
+    return {
+      ok: true,
+      httpStatus: link.httpStatus,
+      body: {
+        delivery: planSummary(plan, { target, applied: !args.dryRun }),
+        ...(read.skipped.length ? { skippedEntries: read.skipped } : {}),
+        next: args.dryRun
+          ? 'Nothing was written. Show the user the plan; run again without dryRun to apply it.'
+          : 'Review the change in the service folder (git status / git diff there) and let the user commit it. Then run and test the service (genesis-run-and-test).',
+      },
+    };
+  },
+  async genesis_applyDesignSystem(args, settings, signal) {
+    if (!SLUG.test(args.slug)) throw new ArgumentError('"slug" must be a catalog slug (lowercase letters, digits and dashes)');
+    const project = findProject(settings.cwd ?? process.cwd());
+    if (!project) {
+      return { ok: false, httpStatus: null, body: genesisError('GENESIS_NO_PROJECT', 'This folder is not a genesis project: run "genesis init" in the project folder first.') };
+    }
+    const res = await callGenesis(settings, `/design-systems/${encodeURIComponent(args.slug)}`, { signal });
+    const ds = res.body?.designSystem;
+    if (!res.ok || !ds || typeof ds.markdown !== 'string') return res;
+    const file = path.join(project.root, DESIGN_SYSTEM_FILE);
+    const head = `${DESIGN_SYSTEM_MARKER} ${ds.slug} (${ds.name}), applied ${new Date().toISOString().slice(0, 10)} by genesis_applyDesignSystem. Apply another one to replace it; edits here are kept until then. -->\n\n`;
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, head + ds.markdown.replace(/\r\n/g, '\n'));
+    return {
+      ok: true,
+      httpStatus: res.httpStatus,
+      body: {
+        applied: { slug: ds.slug, name: ds.name, theme: ds.theme, file, bytes: Buffer.byteLength(ds.markdown) },
+        next: 'Frontend work reads design/DESIGN_SYSTEM.md and follows it (its Agent Prompt Guide and Quick Start first). The board lists it under Documents.',
+      },
+    };
   },
 };
 

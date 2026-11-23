@@ -1,7 +1,8 @@
 # The Genesis Compiler API
 
 > **Builds are dry runs for now** (section 6): the code is generated and measured, nothing is
-> pushed. Do not tell a user a validation or a build ran when you did not see its answer, and
+> pushed. `genesis_deliverService` brings a succeeded service build to this machine (section 7);
+> delivery is open to every Genesis account. Do not tell a user a validation or a build ran when you did not see its answer, and
 > do not invent one: when a call answers `GENESIS_UNREACHABLE`, say the API could not be
 > reached and stop.
 
@@ -72,6 +73,9 @@ Genesis never deploys anything and never runs your services.
 | `genesis_buildService` | `POST /builds` (one service) | Compile one service; answers its `jobId`. |
 | `genesis_getServiceBuild` | `GET /jobs/:jobId` | Follow one service build to its end and read its result. |
 | `genesis_getBuilds` | `GET /builds` | List your builds, newest first. |
+| `genesis_listDesignSystems` | `GET /design-systems` | The design system catalog for the frontend (the genesis-design-system skill). |
+| `genesis_applyDesignSystem` | `GET /design-systems/:slug` | Write the picked system to `design/DESIGN_SYSTEM.md` of the project. |
+| `genesis_deliverService` | `GET /jobs/:jobId/archive` | Bring a succeeded service build to this machine (section 7). |
 
 Every answer is JSON: the API's body with `httpStatus` added. A failure is always
 `{ "error": { "code": "GENESIS_...", "message": "...", "details": {} } }` and the tool marks
@@ -181,8 +185,10 @@ a `jobId` again after a lost session, and to show the user what was compiled.
    files, deploy artifacts, and every failure with its code. A failed service does not stop the
    others; fix the cause (a blueprint fault: fix, validate, compile again; a compiler fault:
    report it with the job id and the exact error) and compile only that service again.
-6. Check whether you have the generated service repositories. A successful dry run provides job
-   results and a file inventory. It leaves no checkout, archive or deploy files you can use locally.
+6. Bring each succeeded service home: `genesis_deliverService` with its jobId writes the generated
+   tree into `<project>/<codename>-<service>-service/` (section 7). If it answers
+   `GENESIS_DELIVERY_NOT_ENABLED` (Genesis turned delivery off for the account), a successful dry
+   run provides job results and a file inventory only: no checkout, archive or deploy files you can use locally.
    If the user already has the matching generated repositories, follow [run-locally.md](run-locally.md)
    and [testing.md](testing.md). Otherwise report the dry-run results and wait for an artifact-producing
    build before starting the run and test steps. Author custom code in the blueprint, as described in
@@ -210,6 +216,15 @@ a `jobId` again after a lost session, and to show the user what was compiled.
 - **Push mode:** a direct push to the base branch by default; the user can switch to pull-request
   mode in the portal. Not available yet: today every build is a dry run (`push` and `target`
   answer `GENESIS_OPTION_NOT_AVAILABLE`).
+- **Local delivery (until pushing opens):** open to every Genesis account. A succeeded service
+  job keeps its generated tree for 7 days, and `genesis_deliverService` downloads it
+  (`GET /jobs/:jobId/archive`, a short-lived link; the sha256 is checked) and applies it to the
+  local service folder with the manifest rule below. It runs no git command: the user reviews
+  and commits.
+  - One local difference: a file that is no longer generated but that the user edited is kept and
+    reported, not deleted.
+  - Where Genesis turned delivery off for the account, `GENESIS_DELIVERY_NOT_ENABLED` answers and
+    the build stays a dry run.
 - **Your files are kept.** Each build writes `.genesis/manifest.json` (the files it generated).
   On the next build a file the previous manifest does not list is yours and survives; a generated
   file you edited is overwritten (and its lines are counted); a file no longer generated is
@@ -256,6 +271,9 @@ bodies. The tools are thin wrappers over these calls:
 | `POST /builds/:id/cancel` | stops a running build; services not started are cancelled; a finished build answers `409 GENESIS_BUILD_FINISHED` |
 | `GET /jobs/:jobId` | one service build |
 | `GET /builds` | the filters of 4.6 as the query |
+| `GET /design-systems` | the catalog: `{ designSystems: [{ slug, name, tagline, theme, summary, similarBrands, colors, bytes }], count, catalogVersion }` |
+| `GET /jobs/:jobId/archive` | `{ archive: { url, auth: "none" \| "bearer", expiresAt, archiveExpiresAt, sha256, bytes, format: "tar.gz", root } }`; `403 GENESIS_DELIVERY_NOT_ENABLED`, `409 GENESIS_ARCHIVE_NOT_AVAILABLE`, `410 GENESIS_ARCHIVE_EXPIRED` |
+| `GET /design-systems/:slug` | `{ designSystem: { ...the row, markdown } }`; an unknown slug answers `404 GENESIS_DESIGN_SYSTEM_NOT_FOUND` |
 
 ## 10. Not available yet
 
