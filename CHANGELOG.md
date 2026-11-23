@@ -3,6 +3,29 @@
 The package follows semantic versioning. Each release names the mind-set range it needs
 (`dependencies["@mindbricks/mind-set"]` in `package.json`).
 
+## 0.10.0 (pre-release)
+
+- **Project diagrams.** The new tool `genesis_buildDiagrams` (`POST /diagrams`) draws every
+  Mermaid diagram of the blueprint and writes the set to `diagrams/diagrams.json` of the project.
+  It is free (no credit, no build); run it again after a blueprint change to refresh the set.
+  - Three tops: the architecture, the data model and the event flow. Each opens the diagrams
+    under it: a service, its data model, an entity, a business API, a topic, a saga.
+  - A blueprint that does not validate is still drawn; the answer says so with the first errors.
+  - A build of the document service carries the same set in its `diagrams/diagrams.json`.
+- **The board's Diagrams tab:** the three tops, a click on a box opens the diagram under it, a trail
+  back, every link listed under the drawing, the validation state, and a warning when the
+  blueprint changed since the draw. The renderer (mermaid 11.15.0) is fetched once, checked against
+  its pinned sha256 and kept under `~/.genesis-set/vendor/`; `GENESIS_MERMAID_FILE` names a local
+  copy instead.
+- The Compiler API corpus page (4.7), the compiler-api skill and the `genesis init` instructions
+  describe the diagrams.
+- **Deploying the frontend:** Genesis writes no frontend deploy files, so the deploy guide (section 7),
+  the genesis-deploy skill and the genesis-frontend skill now say how you write the frontend's
+  deploy config for the target the user picks, set the API host per environment, point the
+  backend's `FRONTEND_URL` at the frontend and verify it in a browser.
+- **A build archive is kept for 3 hours** (was 7 days): deliver right after the build; a later
+  delivery answers `GENESIS_ARCHIVE_EXPIRED` and the service is built again.
+
 ## 0.9.0 (pre-release)
 
 - **Delivery: a succeeded build comes to this machine.** `genesis_deliverService` downloads a

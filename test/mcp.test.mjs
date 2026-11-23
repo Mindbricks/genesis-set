@@ -121,6 +121,7 @@ describe('MCP protocol', () => {
       list.result.tools.map((t) => t.name).sort(),
       [
         'genesis_applyDesignSystem',
+        'genesis_buildDiagrams',
         'genesis_buildService',
         'genesis_deliverService',
         'genesis_getBuilds',
@@ -493,6 +494,6 @@ describe('closing stdin', () => {
     const answers = res.stdout.trim().split('\n').map((l) => JSON.parse(l));
     assert.equal(answers.length, 41);
     assert.ok(res.stdout.length > 256 * 1024, `the answers are large enough to fill a pipe (${res.stdout.length} bytes)`);
-    for (const a of answers.slice(1)) assert.equal(a.result.tools.length, 13);
+    for (const a of answers.slice(1)) assert.equal(a.result.tools.length, 14);
   });
 });

@@ -1,6 +1,6 @@
 ---
 name: genesis-compiler-api
-description: PRE-RELEASE. Compile a validated OpenAPPL blueprint into service code with the Genesis Compiler API through the genesis_* MCP tools (genesis_validateApplication, genesis_validateService, genesis_buildService, genesis_getServiceBuild, genesis_getBuilds), follow each service build and report what it produced. Use it after the blueprint is written and validated with mind-set, when the user wants generated code, deploy files or the status of a build. Do not use it to design or write the blueprint (the mind-set openappl-blueprint-* skills), to run or test the generated services (genesis-run-and-test) or to deploy them (genesis-deploy).
+description: PRE-RELEASE. Compile a validated OpenAPPL blueprint into service code with the Genesis Compiler API through the genesis_* MCP tools (genesis_validateApplication, genesis_validateService, genesis_buildService, genesis_getServiceBuild, genesis_getBuilds), follow each service build and report what it produced, and draw the project diagrams (genesis_buildDiagrams). Use it after the blueprint is written and validated with mind-set, when the user wants generated code, deploy files, the status of a build, or the architecture, data model or event flow diagrams of the blueprint. Do not use it to design or write the blueprint (the mind-set openappl-blueprint-* skills), to run or test the generated services (genesis-run-and-test) or to deploy them (genesis-deploy).
 ---
 
 # Genesis Compiler API
@@ -56,6 +56,16 @@ service build's result is `{{CORPUS}}/genesis/compile-results.md`.
    start the run-and-test skill. If it answers `GENESIS_DELIVERY_NOT_ENABLED` (Genesis turned
    delivery off for the account), a successful dry run provides a report and inventory only;
    say so and stop there.
+
+## The diagrams
+
+`genesis_buildDiagrams` draws every diagram of the blueprint (architecture, data model, event
+flow, and every diagram they open) into `diagrams/diagrams.json` of the project. It is free and
+needs no build: use it when the user wants to see the design, after the blueprint validates, and
+again after each blueprint change (the board flags a set drawn from an older blueprint). Its
+answer is a summary; point the user at the board's Diagrams tab (`genesis_openBoard`) instead of
+pasting Mermaid into the chat. A build of the `document` service carries the same set. The
+guide's section 4.7 describes the file.
 
 ## Not available yet
 

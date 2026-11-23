@@ -187,7 +187,33 @@ Free plan, whose instances spin down after 15 minutes without traffic. Keep ONE 
 the README says so. The user signs in to Render with their own account; nothing about it goes to
 Genesis or into the repository.
 
-## 7. What you never do
+## 7. The frontend: you write its deploy config
+
+Genesis generates no frontend code and no frontend deploy files. The frontend service is a
+briefing package (prompt docs, architect docs, `project.json`); the app in that folder is the
+user's, written with the genesis-frontend skill. So its deploy config is yours to write too, for
+the target the user picks.
+
+- **Pick the target with the user.** A built single-page app is static files: a static host
+  (Netlify, Cloudflare Pages, Vercel, a Render or Railway static site) or a small web-server
+  container next to the compose stack. Ask; do not choose for them.
+- **Write the config in the app**, beside its own files, never inside the generated docs set
+  (the next delivery replaces that set). On a static host, add the fallback that serves
+  `index.html` for every unknown path, or deep links answer 404.
+- **The API host is a build-time setting per environment** (for example `VITE_API_BASE_URL`), set
+  on the target; the service paths come from `project.json` `info.baseUrl`. Never hard-code a host.
+- **The frontend build holds no secrets.** Everything in it is public. Only publishable keys (a
+  payment provider's publishable key) may appear; a secret key belongs to a backend service.
+- **Point the backend at the frontend.** Set `FRONTEND_URL` on each backend service to the
+  frontend's public address: the generated deploy files leave it for you ("your frontend"). The
+  services read it for the session cookie's default domain and for the return addresses of
+  connect flows. If the backend limits CORS (a nodejs service: `CORS_CONTROL_ACTIVE=true` with
+  `ALLOWED_ORIGINS`), add the frontend's origin there; the service README names its variables.
+- **Deploy with the user's own login** on that target, as for the backend.
+- **Verify it in a browser:** the page loads on its public address, a sign-in works, and a screen's
+  API call succeeds with no CORS error. Report the address and what you checked.
+
+## 8. What you never do
 
 - Ask the user for a deploy token to send to Genesis, or store one in the project, the blueprint
   or a commit.

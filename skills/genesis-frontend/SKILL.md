@@ -84,6 +84,13 @@ Give each subagent a complete brief; it knows nothing else:
 Run the steps one at a time: each builds on the app the previous one left. After each step,
 build the app, update the progress file and show the user what changed before the next step.
 
+## Deploying the app
+
+Genesis does not deploy the frontend and writes no deploy files for it. When the user wants the app
+online, the genesis-deploy skill (its Frontend section) covers it: the target is the user's
+choice, you write the deploy config in the app, the API host stays a build-time setting, and
+every backend service gets the frontend's address as `FRONTEND_URL`.
+
 ## When the backend changes
 
 Rebuild and re-deliver the frontend service after a blueprint change. The generated set is

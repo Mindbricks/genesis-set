@@ -9,7 +9,8 @@ Skills that teach a coding agent (Claude Code, Codex) to use the **Genesis compi
 OpenAPPL blueprint: what the generated services do at run time, the Genesis steps next to the
 blueprint procedures, and the Genesis Compiler API (validate, build, follow a build). A local
 MCP server gives the agent the Compiler API as five `genesis_*` tools, two tools for the design
-system catalog the frontend follows, one that delivers a build to your machine, plus four tools and a local page for the keys the agent needs.
+system catalog the frontend follows, one that delivers a build to your machine, one that draws the
+project diagrams, plus four tools and a local page for the keys the agent needs.
 
 genesis-set sits on [mind-set](https://github.com/Mindbricks/mind-set), the OpenAPPL layer.
 mind-set teaches designing and writing the blueprint; genesis-set adds what is specific to
@@ -68,6 +69,13 @@ live from the folder as the agent writes, and shows:
   the BFF and notification services, each service with its data objects and business APIs, and
   any other section), each with its `mindset validate` problem count; picking one shows its JSON
   and its problems in the panel next to it (a literal secret is hidden there);
+- **Diagrams:** the architecture, the data model and the event flow of the blueprint. A click on a
+  box opens the diagram under it (a service, its data model, an entity, a business API, a topic, a
+  saga), with a trail back and every link listed under the drawing. The agent draws them with
+  `genesis_buildDiagrams` (free), and a build of the document service carries them too; the tab
+  says when the blueprint changed since. The drawing uses mermaid, which the board fetches once
+  (pinned version, sha256 checked) and keeps in `~/.genesis-set/vendor/`; `GENESIS_MERMAID_FILE`
+  names a local copy of the same file instead;
 - **Mail:** what the generated services could not deliver: every mail and SMS in the mail sink,
   with its text and the codes in it (see below);
 - **Keys:** this project's keys and your global ones; set, replace, clear, delete and add.
@@ -112,7 +120,7 @@ page then says so, and `genesis board` opens it again.
 | `genesis uninstall [--dry-run]` | Removes only what `install` recorded in `~/.genesis-set/installed.json`, including the MCP registrations. mind-set and your API key file stay. |
 | `genesis doctor` | Both versions (genesis-set and mind-set) and whether they are compatible, the skills of each package and the MCP server per agent, where the API key comes from and which key it is (its type prefix and last four characters, such as `sk_mbx_...9f3a`, never the whole key) and the API base. |
 | `genesis config [show \| set-key \| unset-key \| set-base <url> \| unset-base]` | The API key and API base in `~/.genesis-set/config.json` (mode 0600). `set-key` reads the key from stdin (hidden on a terminal), never from the command line. |
-| `genesis board [<folder>] [--no-open]` | Opens the board of the genesis project in `<folder>` (default: the current one): design flow, documents, interview, blueprint, project and global keys (see "The project board"). |
+| `genesis board [<folder>] [--no-open]` | Opens the board of the genesis project in `<folder>` (default: the current one): design flow, documents, interview, blueprint, diagrams, project and global keys (see "The project board"). |
 | `genesis keys [--no-open]` | Opens the local key page in your browser: add, change, clear or delete the keys your agent uses. The link is new each time; the page closes after 15 idle minutes or on Ctrl+C. `--no-open` only prints the link. |
 | `genesis mcp` | Runs the MCP server on stdio from the package (for a registration by hand). |
 
@@ -144,8 +152,8 @@ the manifest rule:
 - generated files the build no longer makes are deleted (one you edited is kept and reported);
 - everything else is kept: your files, `service-files/` and `.git`.
 
-It runs no git command; you review and commit. `dryRun: true` shows the plan first. Archives are
-kept for 7 days.
+It runs no git command; you review and commit. `dryRun: true` shows the plan first. An archive is
+kept for 3 hours after its build, so deliver right after building; later, build the service again.
 
 **Frontend.** The frontend service's prompt docs, once delivered, drive the frontend work: the
 `genesis-frontend` skill builds the app in that folder one step at a time with subagents, after

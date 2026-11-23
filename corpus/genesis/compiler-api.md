@@ -11,7 +11,7 @@ You write and validate the blueprint locally with mind-set; Genesis turns it int
 test and deploy that code yourself. No project is created or managed anywhere: everything the
 compiler needs comes from the blueprint and the request.
 
-You call it through five MCP tools that genesis-set installs (section 3). For CI or a script
+You call it through the `genesis_*` MCP tools that genesis-set installs (section 3). For CI or a script
 without an agent, the same endpoints are plain REST (section 9).
 
 ## 1. What Genesis generates
@@ -76,6 +76,7 @@ Genesis never deploys anything and never runs your services.
 | `genesis_listDesignSystems` | `GET /design-systems` | The design system catalog for the frontend (the genesis-design-system skill). |
 | `genesis_applyDesignSystem` | `GET /design-systems/:slug` | Write the picked system to `design/DESIGN_SYSTEM.md` of the project. |
 | `genesis_deliverService` | `GET /jobs/:jobId/archive` | Bring a succeeded service build to this machine (section 7). |
+| `genesis_buildDiagrams` | `POST /diagrams` | Draw every diagram of the blueprint into `diagrams/diagrams.json` of the project (4.7). Free. |
 
 Every answer is JSON: the API's body with `httpStatus` added. A failure is always
 `{ "error": { "code": "GENESIS_...", "message": "...", "details": {} } }` and the tool marks
@@ -168,6 +169,37 @@ service, `serviceName`, `jobId`, `status`, `addedLines` and `deletedLines`. A ba
 `400 GENESIS_BAD_FILTER`, a cursor this API did not give `400 GENESIS_BAD_CURSOR`. Use it to find
 a `jobId` again after a lost session, and to show the user what was compiled.
 
+### 4.7 `genesis_buildDiagrams`
+
+Draws every Mermaid diagram of the blueprint and writes the whole set to
+`<project>/diagrams/diagrams.json`, replacing the one there. It is free (no credit, no build) and
+rate limited per account on its own budget. Run it again after a blueprint change: that is the
+refresh. Without `blueprintPath` / `repo` it sends `blueprint.json` of the current project.
+
+- **Three tops, each opening the diagrams under it:**
+  - **Architecture:** the services and their stores, Kafka and sagas. A service opens its
+    flowchart, which opens its data model, its events in and out, its business APIs (each API
+    opens its sequence diagram), the traffic with each peer service and its sagas.
+  - **Data model:** one box per service. A service opens its ERD, an entity opens its data object
+    (APIs, relations, topics, lifecycle and access).
+  - **Event flow:** one box per service. A service opens its event chains, a topic opens its
+    publisher -> Kafka -> consumer sequence.
+- Diagrams no top leads to are listed under `others` (auth flows, the event hub, external maps).
+- **An invalid blueprint is still drawn:** the answer says `valid: false` with the first errors,
+  and the diagrams show what the blueprint holds now. Only a blueprint nothing can be drawn from
+  answers `422 GENESIS_BLUEPRINT_INVALID`.
+- The answer is a summary (file, count, tops, validity). The set itself stays in the file; show
+  it to the user on the board's Diagrams tab (`genesis_openBoard`), where a click on a box opens
+  the diagram under it.
+
+The file (`genesis-diagrams/1`): `{ codename, blueprintHash, generatedAt, valid, validation?,
+roots: [{ key, title, id }], others: [id], count, diagrams: { <id>: { kind, service, api, title,
+type, mermaid, regions: [{ nodeId, kind, target, to }] } } }`. The id is
+`<kind>/<service>/<api>`, each part URI-encoded. `mermaid` is bare Mermaid source (no fence, no
+`click` lines); a region's `nodeId` is the node in that source and `to` is the id of the diagram it
+opens (null when the set has none). `blueprintHash` is the sha256 of the blueprint's JSON text,
+so a reader can tell that the blueprint changed since the draw.
+
 ## 5. How to compile a project
 
 1. Author the blueprint with mind-set and validate it with `mindset validate blueprint.json`.
@@ -208,6 +240,8 @@ a `jobId` again after a lost session, and to show the user what was compiled.
   a Genesis `402` and the user is told to top up. Plan builds so a top-up does not land in the
   middle of a dependent set.
 - Charging and the usage endpoint are not open yet; until then nothing is charged.
+- **Diagrams never cost credit:** `POST /diagrams` charges nothing, and the diagram file a
+  document build writes (section 7) is not counted in its added lines.
 
 ## 7. Where the code goes
 
@@ -217,7 +251,8 @@ a `jobId` again after a lost session, and to show the user what was compiled.
   mode in the portal. Not available yet: today every build is a dry run (`push` and `target`
   answer `GENESIS_OPTION_NOT_AVAILABLE`).
 - **Local delivery (until pushing opens):** open to every Genesis account. A succeeded service
-  job keeps its generated tree for 7 days, and `genesis_deliverService` downloads it
+  job keeps its generated tree for 3 hours (deliver right after the build; after that the archive
+  answers `410 GENESIS_ARCHIVE_EXPIRED` and the service is built again), and `genesis_deliverService` downloads it
   (`GET /jobs/:jobId/archive`, a short-lived link; the sha256 is checked) and applies it to the
   local service folder with the manifest rule below. It runs no git command: the user reviews
   and commits.
@@ -233,6 +268,10 @@ a `jobId` again after a lost session, and to show the user what was compiled.
 - **Service files** (bytes the blueprint's service library refers to) live in your service
   repository, not in Genesis. Until builds compile onto your repositories, a build cannot read
   them; the build log says so.
+- **Diagrams:** a build of the `document` service also writes the project diagrams to
+  `diagrams/diagrams.json` of that service (the job's `diagrams`: `{ path, count, valid }`). The
+  file is generated and delivered like any other, but its lines are not counted. The board shows
+  whichever set is newer, this one or the one `genesis_buildDiagrams` wrote.
 - **Deploy artifacts:** `deployTargets` (`"docker-compose"`, `"railway"`, `"fly"`, `"render"`)
   writes `deploy/<target>/` into each service (generated files, counted like any other).
   Genesis never deploys: you, or the user's own tools, run the deploy with the
@@ -246,7 +285,8 @@ a `jobId` again after a lost session, and to show the user what was compiled.
 | `GENESIS_UNAUTHENTICATED`, `GENESIS_BAD_CREDENTIALS` | 401, 400 | The key was not accepted: the user sets the right one. |
 | `GENESIS_ACCOUNT_REQUIRED` | 403 | A service credential was used; a user API key is needed. |
 | `GENESIS_UNREACHABLE`, `GENESIS_TIMEOUT`, `GENESIS_BAD_RESPONSE` | local | The API did not answer properly. Say so; do not retry in a loop. A build retry reuses its key. |
-| `GENESIS_RATE_LIMITED` | 429 | Validation budget spent: wait a minute. |
+| `GENESIS_RATE_LIMITED` | 429 | Validation or diagram budget spent: wait a minute. |
+| `GENESIS_NO_DIAGRAMS` | 422 | The blueprint is valid but has nothing to draw. |
 | `GENESIS_BLUEPRINT_INVALID` | 422 | Fix the findings in `details`. |
 | `GENESIS_BLUEPRINT_UNREADABLE` | 422 | The blueprint could not be loaded at all: check its structure with `mindset validate`. |
 | `GENESIS_BLUEPRINT_TOO_LARGE`, `GENESIS_PAYLOAD_TOO_LARGE` | local, 413 | Over the size limit. |
@@ -274,6 +314,7 @@ bodies. The tools are thin wrappers over these calls:
 | `GET /design-systems` | the catalog: `{ designSystems: [{ slug, name, tagline, theme, summary, similarBrands, colors, bytes }], count, catalogVersion }` |
 | `GET /jobs/:jobId/archive` | `{ archive: { url, auth: "none" \| "bearer", expiresAt, archiveExpiresAt, sha256, bytes, format: "tar.gz", root } }`; `403 GENESIS_DELIVERY_NOT_ENABLED`, `409 GENESIS_ARCHIVE_NOT_AVAILABLE`, `410 GENESIS_ARCHIVE_EXPIRED` |
 | `GET /design-systems/:slug` | `{ designSystem: { ...the row, markdown } }`; an unknown slug answers `404 GENESIS_DESIGN_SYSTEM_NOT_FOUND` |
+| `POST /diagrams` | `{ "blueprint": { "inline": {...} }, "language"? }` -> `{ diagrams: <the genesis-diagrams/1 set of 4.7> }`; no charge, its own per-minute limit; nothing is kept on the server |
 
 ## 10. Not available yet
 

@@ -59,7 +59,7 @@ describe('npm pack, installed from the tarball', { skip: PACKAGE ? false : 'no b
   test('the tarball holds the package and not the tests', () => {
     const [info] = JSON.parse(npm(['pack', PACKAGE, '--json', '--pack-destination', work], work));
     const files = new Set(info.files.map((f) => f.path));
-    for (const f of ['package.json', 'bin/genesis-set.mjs', 'lib/install.mjs', 'lib/semver.mjs', 'lib/mcp-config.mjs', 'lib/config-cli.mjs', 'lib/init.mjs', 'mcp/board.mjs', 'mcp/board-data.mjs', 'mcp/board-html.mjs', 'mcp/board-md.mjs', 'mcp/project.mjs', 'mcp/mail-view.mjs', 'mcp/server.mjs', 'mcp/tools.mjs', 'mcp/client.mjs', 'mcp/config.mjs', 'mcp/blueprint.mjs', 'LICENSE', 'README.md', 'CHANGELOG.md', 'corpus/README.md', 'corpus/genesis/compiler-api.md', 'corpus/genesis/procedures/README.md']) {
+    for (const f of ['package.json', 'bin/genesis-set.mjs', 'lib/install.mjs', 'lib/semver.mjs', 'lib/mcp-config.mjs', 'lib/config-cli.mjs', 'lib/init.mjs', 'mcp/board.mjs', 'mcp/board-data.mjs', 'mcp/board-html.mjs', 'mcp/board-md.mjs', 'mcp/board-diagrams.mjs', 'mcp/diagram-frame-html.mjs', 'mcp/project.mjs', 'mcp/mail-view.mjs', 'mcp/server.mjs', 'mcp/tools.mjs', 'mcp/client.mjs', 'mcp/config.mjs', 'mcp/blueprint.mjs', 'LICENSE', 'README.md', 'CHANGELOG.md', 'corpus/README.md', 'corpus/genesis/compiler-api.md', 'corpus/genesis/procedures/README.md']) {
       assert.ok(files.has(f), `${f} is not in the tarball`);
     }
     const skills = skillsOf(PACKAGE);

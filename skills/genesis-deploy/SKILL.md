@@ -1,6 +1,6 @@
 ---
 name: genesis-deploy
-description: Deploy the services the Genesis compiler generated, with the user's own login on the target - the docker-compose stack, Railway, Fly.io and Render - from the deploy files a Genesis build writes into each service (deploy/<target>/). Use it when the user wants the generated backend running somewhere: a server, Railway, Fly.io, Render. Genesis never deploys; this skill tells you how the user's own tools do it. Do not use it to compile (genesis-compiler-api) or for a local test run (genesis-run-and-test).
+description: Deploy the services the Genesis compiler generated, with the user's own login on the target - the docker-compose stack, Railway, Fly.io and Render - from the deploy files a Genesis build writes into each service (deploy/<target>/), and deploy the frontend app, whose deploy config you write yourself for the target the user picks. Use it when the user wants the generated backend or the frontend running somewhere: a server, Railway, Fly.io, Render, a static host. Genesis never deploys; this skill tells you how the user's own tools do it. Do not use it to compile (genesis-compiler-api) or for a local test run (genesis-run-and-test).
 ---
 
 # Deploying the generated services
@@ -35,3 +35,15 @@ tell the user, and do not write the files by hand.
    address and the health verdict per service; never report a deploy you did not see succeed.
 5. A target the API does not accept (`GENESIS_UNKNOWN_DEPLOY_TARGET`): say it is not available;
    do not write its config by hand as if Genesis had generated it.
+
+## The frontend
+
+Genesis writes no frontend deploy files: the frontend app is the user's (genesis-frontend), and
+so is its deploy config. Follow deploy.md section 7:
+1. Agree the target with the user (a static host, or a web-server container next to the stack).
+2. Write the config in the app, never in the generated docs set; the API host is a build-time
+   setting per environment; no secret goes into the frontend build.
+3. Set `FRONTEND_URL` on every backend service to the frontend's public address, and add the
+   frontend's origin where the backend limits CORS.
+4. Deploy with the user's own login, then verify in a browser: the page loads, a sign-in works and
+   an API call succeeds with no CORS error.

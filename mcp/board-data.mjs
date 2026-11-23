@@ -15,6 +15,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { blueprintModules, hideSecrets, isUnder, valueAt, withProblemCounts } from './board-blueprint.mjs';
+import { diagramsState } from './board-diagrams.mjs';
 import { dataDirOf } from './config.mjs';
 import { listKeys } from './key-store.mjs';
 
@@ -286,6 +287,8 @@ export async function boardState({ env = process.env, project }) {
     flow: await flow(env, project.root, pipeline, files),
     designSystem: designSystemOf(files),
     frontend: frontendState(project.root),
+    // #9407: the project diagrams (drawn with genesis_buildDiagrams, or delivered with the document service).
+    diagrams: diagramsState(project.root, bp && !bp.error ? bp.raw : null),
     interview: interviewSummary(files.has('interview-record') ? readText(files.get('interview-record').file) : null),
     blueprint: bp ? { file: bp.file, name: bp.name ?? null, services: bp.services ?? [], error: bp.error ?? null, mtime: bp.mtime ?? null } : null,
     validation: v ? (({ problems, ...summary }) => summary)(v) : v,

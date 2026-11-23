@@ -23,7 +23,9 @@ import path from 'node:path';
 
 import { dataDirOf } from './config.mjs';
 import { blueprintModule, boardState, designDoc, frontendDoc } from './board-data.mjs';
+import { MERMAID_VERSION, diagramsBundle, mermaidScript } from './board-diagrams.mjs';
 import { renderBoardPage } from './board-html.mjs';
+import { renderDiagramFrame } from './diagram-frame-html.mjs';
 import { renderMarkdown } from './board-md.mjs';
 import { KeyStoreError, SCOPES, clearKeyValue, deleteKey, requestKey, setKeyValue } from './key-store.mjs';
 import { clearMail, listMail, readMail } from './mail-view.mjs';
@@ -65,7 +67,23 @@ function headers(res, nonce) {
   res.setHeader(
     'Content-Security-Policy',
     `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; ` +
-      "img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+      "img-src 'self' data:; frame-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+  );
+}
+
+/** The script path the diagram page loads mermaid from (versioned, so it can be cached). */
+export const MERMAID_PATH = `/assets/mermaid-${MERMAID_VERSION}.js`;
+
+/**
+ * #9407: the diagram page runs mermaid, which writes <style> into every SVG it draws: it needs
+ * inline styles, so it is its own document with its own policy, framed only by the board.
+ */
+function diagramFrameHeaders(res, nonce) {
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader(
+    'Content-Security-Policy',
+    `default-src 'none'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'unsafe-inline'; connect-src 'self'; ` +
+      "img-src 'self' data:; font-src 'self' data:; frame-ancestors 'self'; base-uri 'none'; form-action 'none'",
   );
 }
 
@@ -163,6 +181,29 @@ async function handle(board, req, res) {
       return sendError(res, 502, 'GENESIS_BOARD_MAIL_SINK', `the mail sink did not clear: ${e.message}`);
     }
     return sendJson(res, 200, { cleared: true });
+  }
+  if (req.method === 'GET' && url.pathname === '/diagrams-frame') {
+    diagramFrameHeaders(res, nonce);
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.end(renderDiagramFrame({ nonce, mermaidPath: MERMAID_PATH }));
+  }
+  if (req.method === 'GET' && url.pathname === MERMAID_PATH) {
+    let bytes;
+    try {
+      bytes = await mermaidScript(board.env);
+    } catch (e) {
+      return sendError(res, 503, 'GENESIS_BOARD_NO_RENDERER', e.message);
+    }
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'text/javascript; charset=utf-8');
+    res.setHeader('Cache-Control', 'private, max-age=86400, immutable');
+    return res.end(bytes);
+  }
+  if (req.method === 'GET' && url.pathname === '/api/diagrams') {
+    const set = diagramsBundle(board.project.root);
+    if (!set) return sendError(res, 404, 'GENESIS_BOARD_NO_DIAGRAMS', 'no diagrams in this project yet');
+    return sendJson(res, 200, set);
   }
   if (req.method === 'GET' && url.pathname === '/api/blueprint') {
     const m = await blueprintModule(board.env, board.project, url.searchParams.get('path') ?? '$');

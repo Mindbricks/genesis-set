@@ -101,13 +101,14 @@ button:disabled, input:disabled { opacity: .55; cursor: default; }
 #flash.ok { display: block; color: var(--ok); background: var(--ok-bg); }
 #flash.err { display: block; color: var(--bad); background: var(--bad-bg); }
 footer { color: var(--muted); font-size: 13px; margin-top: 24px; }
+.dframe { display: block; width: 100%; height: max(560px, calc(100vh - 260px)); border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
 `;
 
 const SCRIPT = `
 (() => {
   const main = document.getElementById('main');
   const flash = document.getElementById('flash');
-  const TABS = ['overview', 'documents', 'interview', 'blueprint', 'frontend', 'mail', 'keys'];
+  const TABS = ['overview', 'documents', 'interview', 'blueprint', 'diagrams', 'frontend', 'mail', 'keys'];
   let state = null, shown = '', docCache = new Map(), moduleCache = new Map(), afterRender = null;
 
   function el(tag, cls, text) {
@@ -373,6 +374,37 @@ const SCRIPT = `
     return wrap;
   }
 
+  // #9407: the project diagrams. The drawing runs in its own page (/diagrams-frame: mermaid needs
+  // inline styles, which this page does not allow); the diagram it shows is kept in this address.
+  function diagrams(arg) {
+    const frag = document.createDocumentFragment();
+    const d = state.diagrams;
+    const card = el('section', 'card');
+    card.append(el('h2', '', 'Diagrams'));
+    if (!d) {
+      card.append(el('p', 'muted', 'No diagrams yet. Ask the agent to draw them (genesis_buildDiagrams): the architecture, the data model and the event flow of the blueprint, each opening the diagrams under it. A build of the document service carries them too.'));
+      frag.append(card);
+      return frag;
+    }
+    if (d.error) { card.append(el('p', 'note', d.error)); frag.append(card); return frag; }
+    const r = el('div', 'row');
+    r.append(el('span', 'grow small muted', d.count + ' diagrams · ' + (d.source === 'build' ? 'from the document service build' : 'drawn with genesis_buildDiagrams') + (d.generatedAt ? ' · ' + when(d.generatedAt) : '') + ' · ' + d.file));
+    r.append(el('span', 'chip ' + (d.valid ? 'ok' : 'bad'), d.valid ? 'Valid blueprint' : d.errorCount + ' validation error(s)'));
+    if (d.blueprintChanged) r.append(el('span', 'chip warn', 'Blueprint changed since'));
+    card.append(r);
+    if (d.blueprintChanged) card.append(el('p', 'note', 'blueprint.json changed after these diagrams were drawn. Ask the agent to draw them again (genesis_buildDiagrams).'));
+    frag.append(card);
+    const frame = el('iframe', 'dframe');
+    frame.title = 'Project diagrams';
+    frame.src = '/diagrams-frame' + (arg ? '#' + encodeURIComponent(arg) : '');
+    frag.append(frame);
+    return frag;
+  }
+  window.addEventListener('message', (ev) => {
+    if (ev.origin !== location.origin || !ev.data || ev.data.type !== 'genesis-diagram' || typeof ev.data.id !== 'string') return;
+    if (route().tab === 'diagrams') history.replaceState(null, '', '#diagrams/' + encodeURIComponent(ev.data.id));
+  });
+
   /** A message's title: its subject, marked SMS unless the subject already says so. */
   function smsTitle(x) {
     const subject = x.subject || '(no subject)';
@@ -497,11 +529,12 @@ const SCRIPT = `
   async function render(force) {
     const { tab, arg } = route();
     for (const a of document.querySelectorAll('nav a')) a.classList.toggle('on', a.dataset.tab === tab);
-    const sig = tab + '|' + arg + '|' + JSON.stringify(state);
+    // The Diagrams tab is redrawn only when its set changes: the frame keeps its own place.
+    const sig = tab === 'diagrams' ? 'diagrams|' + JSON.stringify(state.diagrams) : tab + '|' + arg + '|' + JSON.stringify(state);
     if (sig === shown && !force) return;
     if (!force && tab === 'keys' && typing()) return;
     shown = sig;
-    const content = tab === 'overview' ? overview() : tab === 'documents' ? await documents(arg) : tab === 'interview' ? interview() : tab === 'blueprint' ? await blueprint(arg) : tab === 'frontend' ? await frontend(arg) : tab === 'mail' ? await mail(arg) : keys();
+    const content = tab === 'overview' ? overview() : tab === 'documents' ? await documents(arg) : tab === 'interview' ? interview() : tab === 'blueprint' ? await blueprint(arg) : tab === 'diagrams' ? diagrams(arg) : tab === 'frontend' ? await frontend(arg) : tab === 'mail' ? await mail(arg) : keys();
     main.replaceChildren(content);
     // A view that needs its own layout settled (the blueprint list scroll) runs after it is in the page.
     if (afterRender) { const f = afterRender; afterRender = null; f(); }
@@ -544,7 +577,7 @@ export function renderBoardPage({ nonce, projectName, idleMinutes = 30 }) {
     '<body><header><div class="bar">' +
     `<div class="title"><h1>${esc(projectName)}</h1><span class="sub">Genesis project board</span></div>` +
     '<nav><a href="#overview" data-tab="overview">Overview</a><a href="#documents" data-tab="documents">Documents</a>' +
-    '<a href="#interview" data-tab="interview">Interview</a><a href="#blueprint" data-tab="blueprint">Blueprint</a><a href="#frontend" data-tab="frontend">Frontend</a>' +
+    '<a href="#interview" data-tab="interview">Interview</a><a href="#blueprint" data-tab="blueprint">Blueprint</a><a href="#diagrams" data-tab="diagrams">Diagrams</a><a href="#frontend" data-tab="frontend">Frontend</a>' +
     '<a href="#mail" data-tab="mail">Mail</a><a href="#keys" data-tab="keys">Keys</a></nav></div></header>' +
     '<main id="main"></main>' +
     `<div class="bar"><footer>Local board on 127.0.0.1, read from the project folder as the agent writes. It closes after ${Number(idleMinutes)} minutes without use; open it any time with <code>genesis board</code> in the project folder.</footer></div>` +

@@ -8,6 +8,7 @@
 //   genesis_listDesignSystems    GET  /design-systems
 //   genesis_applyDesignSystem    GET  /design-systems/:slug, written to design/DESIGN_SYSTEM.md
 //   genesis_deliverService       GET  /jobs/:jobId/archive, downloaded and applied to the local service folder
+//   genesis_buildDiagrams        POST /diagrams, the whole set written to diagrams/diagrams.json of the project
 //
 // and the local key tools of ./key-tools.mjs (genesis_requestKey,
 // genesis_listKeys, genesis_openKeyManager, genesis_writeKeyToEnvFile), which
@@ -31,6 +32,7 @@ const MAX_ARCHIVE_BYTES = 300 * 1024 * 1024;
 import { missingKeyMessage } from './config.mjs';
 import { KEY_TOOLS, isKeyTool, runKeyTool } from './key-tools.mjs';
 import { findProject } from './project.mjs';
+import { DIAGRAMS_FILE } from './board-diagrams.mjs';
 
 /** The file the chosen design system is written to, and the marker line it starts with. */
 export const DESIGN_SYSTEM_FILE = path.join('design', 'DESIGN_SYSTEM.md');
@@ -214,6 +216,25 @@ const API_TOOLS = [
     },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   },
+  {
+    name: 'genesis_buildDiagrams',
+    title: 'Draw the project diagrams',
+    description:
+      'Draw every Mermaid diagram of the blueprint with Genesis (POST /diagrams): the architecture, the data model and the event flow, each with the diagrams they open on a click (services, data objects, business APIs, topics, sagas). ' +
+      'Free (no credit) and rate limited. Answers the whole set at once and writes it to diagrams/diagrams.json of the project, replacing the one there: run it again after a blueprint change to refresh the diagrams. ' +
+      'The answer is a summary; the board shows the diagrams on its Diagrams tab (genesis_openBoard). A blueprint that does not validate is still drawn: the answer says valid: false with the first errors. ' +
+      'Default blueprint: blueprint.json of the project. A build of the document service carries the same set (its diagrams/diagrams.json).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        blueprintPath: { ...BLUEPRINT_PATH, description: `${BLUEPRINT_PATH.description} Default: blueprint.json of the current genesis project.` },
+        repo: REPO_SOURCE,
+        language: LANGUAGE,
+      },
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  },
 ];
 
 export const TOOLS = [...API_TOOLS, ...KEY_TOOLS];
@@ -362,6 +383,47 @@ const HANDLERS = {
         next: args.dryRun
           ? 'Nothing was written. Show the user the plan; run again without dryRun to apply it.'
           : 'Review the change in the service folder (git status / git diff there) and let the user commit it. Then run and test the service (genesis-run-and-test).',
+      },
+    };
+  },
+  async genesis_buildDiagrams(args, settings, signal) {
+    const cwd = settings.cwd ?? process.cwd();
+    const project = findProject(cwd);
+    let source;
+    if (args.blueprintPath === undefined && args.repo === undefined) {
+      if (!project) {
+        return { ok: false, httpStatus: null, body: genesisError('GENESIS_NO_PROJECT', 'This folder is not a genesis project: pass blueprintPath, or run "genesis init" in the project folder first.') };
+      }
+      source = { inline: readLocalJson(path.join(project.root, 'blueprint.json'), { maxBytes: settings.maxBlueprintBytes, kind: 'blueprint', cwd }) };
+    } else {
+      source = blueprintSource(args, settings, ['blueprintPath', 'repo']);
+    }
+    const res = await callGenesis(settings, '/diagrams', { method: 'POST', body: withDefined({ blueprint: source, language: args.language }), signal });
+    const set = res.body?.diagrams;
+    if (!res.ok || !set || typeof set !== 'object' || !set.diagrams) return res;
+    const file = path.join(project?.root ?? cwd, DIAGRAMS_FILE);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    const tmp = `${file}.${process.pid}.tmp`;
+    fs.writeFileSync(tmp, `${JSON.stringify(set, null, 2)}\n`);
+    fs.renameSync(tmp, file);
+    const errors = Array.isArray(set.validation?.errors) ? set.validation.errors : [];
+    return {
+      ok: true,
+      httpStatus: res.httpStatus,
+      body: {
+        diagrams: {
+          file,
+          count: set.count,
+          valid: set.valid,
+          roots: (set.roots ?? []).map((r) => r.title),
+          others: Array.isArray(set.others) ? set.others.length : 0,
+          generatedAt: set.generatedAt,
+          blueprintHash: set.blueprintHash,
+        },
+        ...(set.valid === false ? { validation: { errorCount: set.validation?.errorCount ?? errors.length, firstErrors: errors.slice(0, 10) } } : {}),
+        next: project
+          ? 'The board shows them on its Diagrams tab (genesis_openBoard): start at Architecture, Data model or Event flow and click a box to open the diagram under it.'
+          : `Written to ${file}. In a genesis project the board shows them on its Diagrams tab.`,
       },
     };
   },

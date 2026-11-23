@@ -62,6 +62,7 @@ describe('MCP registration at install', () => {
     // the registered command really serves the five API tools, the two design system tools, the delivery tool, the four key tools and the board tool
     assert.deepEqual(listTools(process.execPath, [serverOf(home)], { HOME: home, PATH: process.env.PATH }), [
       'genesis_applyDesignSystem',
+      'genesis_buildDiagrams',
       'genesis_buildService',
       'genesis_deliverService',
       'genesis_getBuilds',
