@@ -143,6 +143,7 @@ dependencies besides Node 18.
 | `genesis_listDesignSystems` | `GET /design-systems` |
 | `genesis_applyDesignSystem` | `GET /design-systems/:slug`, written to `design/DESIGN_SYSTEM.md` of the project |
 | `genesis_deliverService` | `GET /jobs/:jobId/archive`, downloaded (sha256 checked) and applied to `<project>/<codename>-<service>-service/` |
+| `genesis_buildDiagrams` | `POST /diagrams`, the whole set written to `diagrams/diagrams.json` of the project |
 
 **Delivery.** Until builds push to your repositories, a succeeded service build comes to your
 machine as an archive. Delivery is open to every Genesis account; `GENESIS_DELIVERY_NOT_ENABLED`
@@ -154,6 +155,16 @@ the manifest rule:
 
 It runs no git command; you review and commit. `dryRun: true` shows the plan first. An archive is
 kept for 3 hours after its build, so deliver right after building; later, build the service again.
+
+**Diagrams.** `genesis_buildDiagrams` sends the blueprint and gets back every Mermaid diagram of
+the project in one answer: three tops (the architecture, the data model and the event flow) and
+every diagram they open (a service, its data model, an entity, a business API, a topic, a saga).
+It writes the set to `diagrams/diagrams.json`, replacing the one there, and the board's Diagrams
+tab draws it with click-through between levels. It is free: no credit, no build, open to every
+Genesis account, limited only per minute. Genesis keeps nothing: run it again after each
+blueprint change to refresh the set (the tab warns when the blueprint changed since). A blueprint
+that does not validate is still drawn, and the answer says so. A build of the document service
+carries the same set in its own `diagrams/diagrams.json`.
 
 **Frontend.** The frontend service's prompt docs, once delivered, drive the frontend work: the
 `genesis-frontend` skill builds the app in that folder one step at a time with subagents, after

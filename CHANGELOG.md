@@ -3,6 +3,11 @@
 The package follows semantic versioning. Each release names the mind-set range it needs
 (`dependencies["@mindbricks/mind-set"]` in `package.json`).
 
+## 0.10.1 (pre-release)
+
+- The README lists `genesis_buildDiagrams` among the MCP tools and describes the diagrams (what
+  the set holds, where it is written, that it is free and refreshed on request).
+
 ## 0.10.0 (pre-release)
 
 - **Project diagrams.** The new tool `genesis_buildDiagrams` (`POST /diagrams`) draws every

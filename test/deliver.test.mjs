@@ -140,6 +140,38 @@ describe('the manifest rule', () => {
     assert.equal(read(t, 'src/new.ts'), 'n');
   });
 
+  test('the user\'s service-files/ bytes survive the first delivery and every re-delivery', () => {
+    // A build archive carries no service-file bytes (they are the user's): it
+    // holds the accessor and the Dockerfile that expect them under service-files/.
+    const t = tempDir();
+    fs.mkdirSync(path.join(t, 'service-files', 'public', 'legal'), { recursive: true });
+    fs.mkdirSync(path.join(t, 'service-files', 'private'), { recursive: true });
+    fs.writeFileSync(path.join(t, 'service-files', 'public', 'legal', 'terms.md'), '# Terms\n');
+    fs.writeFileSync(path.join(t, 'service-files', 'private', 'rates.json'), '{"vat":20}');
+    const generated = { 'src/service-files/index.ts': 'accessor v1', Dockerfile: 'COPY service-files ./service-files', 'src/old.ts': 'o' };
+    const first = apply(t, generated);
+    assert.equal(first.firstDelivery, true);
+    assert.equal(read(t, 'service-files/public/legal/terms.md'), '# Terms\n');
+    assert.equal(read(t, 'service-files/private/rates.json'), '{"vat":20}');
+    assert.deepEqual(first.editedOverwritten, [], 'no user file is reported as overwritten');
+
+    // A re-delivery that changes and drops generated files keeps them too.
+    const next = apply(t, { 'src/service-files/index.ts': 'accessor v2', Dockerfile: 'COPY service-files ./service-files' });
+    assert.deepEqual(next.remove, ['src/old.ts']);
+    assert.equal(read(t, 'service-files/public/legal/terms.md'), '# Terms\n');
+    assert.equal(read(t, 'service-files/private/rates.json'), '{"vat":20}');
+
+    // Even a previous manifest that listed a service file with its current
+    // bytes (an older build that shipped them) never makes a later delivery
+    // delete it.
+    const listed = apply(t, { 'src/service-files/index.ts': 'accessor v2', Dockerfile: 'COPY service-files ./service-files', 'service-files/public/legal/terms.md': '# Terms\n' });
+    assert.deepEqual(listed.skippedCustomer, ['service-files/public/legal/terms.md']);
+    const dropped = apply(t, { 'src/service-files/index.ts': 'accessor v3' });
+    assert.deepEqual(dropped.remove, ['Dockerfile']);
+    assert.equal(read(t, 'service-files/public/legal/terms.md'), '# Terms\n');
+    assert.equal(read(t, 'service-files/private/rates.json'), '{"vat":20}');
+  });
+
   test('an empty folder left by a deleted file goes; an archive without a manifest is refused', () => {
     const t = tempDir();
     apply(t, { 'src/x/only.ts': '1', 'keep.ts': 'k' });
